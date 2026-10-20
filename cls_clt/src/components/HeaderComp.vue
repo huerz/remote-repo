@@ -4,6 +4,7 @@ import type { AxiosInstance } from 'axios'
 import type { ApiResult, Classictype } from '@/types'
 // 引入 Token 状态管理
 import { useTokenStore } from '@/stores/token'
+import { ElMessage } from 'element-plus'
 
 // ============================================================================
 // 【接口 1】图片显示 API（Logo / 用户头像）
@@ -39,8 +40,6 @@ const token = computed(() => userStore.token)
 const nickname = ref<string>('')
 const nickFirst = computed(() => (nickname.value || '我').slice(0, 1))
 
-// 未登录时的默认头像（圆形占位图，与已登录头像同款）
-const circleUrl = ref('/svr/api/image/display/head/tx.png')
 
 // ============================================================================
 // 【接口 2】文学导航 API（首页顶部导航栏的文学作品类型）
@@ -101,6 +100,8 @@ function initAvatar() {
         // 没有权限或权限已过期，设置 Token 为空
         user_url.value = '/svr/api/image/display/head/tx.png'
         userStore.setToken('')
+        // 明确告诉用户登录过期了，否则只会看到头像和菜单「莫名其妙消失」
+        ElMessage({ message: '登录已过期，请重新登录', type: 'warning', plain: true })
       }
     })
   }
@@ -133,10 +134,7 @@ onMounted(() => {
       {{ item.name }}
     </el-menu-item>
     <div class="flex-grow" />
-    <!-- 未登录：默认头像（size=50）+ 注册 / 登录 -->
-    <div v-if="token === ''" class="avatar-slot">
-      <el-avatar :size="36" :src="circleUrl">客</el-avatar>
-    </div>
+    <!-- 未登录：注册 / 登录 -->
     <el-menu-item v-if="token === ''" index="/register">注册</el-menu-item>
     <el-menu-item v-if="token === ''" index="/login">登录</el-menu-item>
     <!-- 已登录：显示用户中心（头像 + 退出） -->
@@ -170,14 +168,6 @@ onMounted(() => {
   color: #7a6449;
   background: #efe2cc;
   border: 1px solid #e6d8bf;
-}
-
-/* 未登录时的默认头像：60px 的菜单栏里放 36px，上下各留 12px 才不顶满；
-   与右侧「注册/登录」之间留 10px */
-.avatar-slot {
-  display: flex;
-  align-items: center;
-  margin-right: 10px;
 }
 
 /* 已登录头像在 sub-menu 的标题里，收起一点内边距，避免 50px 头像撑得太开 */
