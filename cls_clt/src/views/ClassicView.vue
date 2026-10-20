@@ -474,8 +474,8 @@ watch(() => route.params.cid, (val) => {
 
 /* 可打分星级：未点亮图标默认近白色，在宣纸底上几乎看不见，统一调深 */
 .classic-judge :deep(.el-rate) {
-  --el-rate-void-color: #cbb693;
-  --el-rate-disabled-void-color: #cbb693;
+  --el-rate-void-color: #bda67f;
+  --el-rate-disabled-void-color: #bda67f;
 }
 
 /* ================= 书评区样式 ================= */
@@ -520,7 +520,8 @@ watch(() => route.params.cid, (val) => {
 }
 
 .discuss-empty {
-  padding: 34px 0 26px;
+  /* 空态只占一两行文字，上下留白收窄一点，否则一张卡片中间空出一大片 */
+  padding: 20px 0 8px;
   text-align: center;
   font-size: 13px;
   color: #a2917a;
@@ -618,8 +619,8 @@ watch(() => route.params.cid, (val) => {
 }
 
 .discuss-login-tip {
-  margin: 18px 0 0;
-  padding-top: 16px;
+  margin: 10px 0 0;
+  padding-top: 12px;
   font-size: 13px;
   color: #8c7a63;
   text-align: center;
