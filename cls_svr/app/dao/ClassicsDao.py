@@ -76,13 +76,20 @@ class ClassicsDao:
 
     # 7. 评价文学作品（教材 6.3.5）
     #    向评价表插入一条记录，并把作品的星级更新为"已有评分与新评分中的较大值"
+    #    注意单位：前端提交的是 1~5 星，classics.rating 存的是 0~100 分
+    #    （前端展示时 rating/20 换算成 5 星），所以这里必须先 ×20 再比较，
+    #    否则 max(5, 90) 永远等于原值，用户的评价等于白打。
     def updateClassicRating(self, judge):
         flag = True  # 成功标志
         try:
             # 查询文学作品
             classics = Classics.query.get(judge.cid)
+            # 星级换算成百分制
+            new_rating = judge.rating * 20
             # 设置文学作品星级（取最高评分）
-            classics.rating = max(judge.rating, classics.rating)
+            classics.rating = max(new_rating, classics.rating or 0)
+            # 评价数 +1（前端详情页要展示评价人数）
+            classics.commentscount = (classics.commentscount or 0) + 1
             # 将评价信息加入文学评价表
             db.session.add(judge)
             db.session.commit()  # 提交至数据库

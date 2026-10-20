@@ -34,7 +34,8 @@ class Users(db.Model):
 class UsersSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
         model = Users
-        fields = ("uid", "uname", "upwd", "nickname", "avatar", "sex", "phone",
+        # 注意：不要把 upwd 放进序列化字段，否则接口会把密码明文返回给前端
+        fields = ("uid", "uname", "nickname", "avatar", "sex", "phone",
 "remark")
 class Classics(db.Model):
     __tablename__ = 'classics'

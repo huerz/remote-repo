@@ -163,7 +163,8 @@ def protected():
 # 调用方式：GET /api/user/get-user
 # 请求头：Authorization: Bearer <token>（必须是登录后拿到的令牌）
 # 参数：无（用户编号从 Token 里取，不需要前端传）
-# 返回：{code:'200', msg:'操作成功！', data:{uid, uname, upwd, nickname, avatar, sex, phone, remark}}
+# 返回：{code:'200', msg:'操作成功！', data:{uid, uname, nickname, avatar, sex, phone, remark}}
+#       注意：不返回 upwd（密码属于敏感字段，绝不能下发到前端）
 #       Token 无效/过期 → 401（由 flask_jwt_extended 返回）
 #       用户不存在 → {code:'404', msg:'操作失败！'}
 # ============================================================================

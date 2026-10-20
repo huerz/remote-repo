@@ -85,6 +85,8 @@ function judgeCls(value: number) {
     const body = response.data as { code: string; msg: string }
     if (body.code == '200') {
       ElMessage({ message: '评价成功！', type: 'success', plain: true })
+      // 重新拉取作品信息，让「评分 / 评价数」立刻反映这次打分
+      initCls()
     }
   }).catch(function (error) {
     console.log(error)
