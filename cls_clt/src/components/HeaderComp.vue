@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref, inject, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import type { AxiosInstance } from 'axios'
 import type { ApiResult, Classictype } from '@/types'
 // 引入 Token 状态管理
 import { useTokenStore } from '@/stores/token'
 import { ElMessage } from 'element-plus'
+import { UserFilled } from '@element-plus/icons-vue'
 
 // ============================================================================
 // 【接口 1】图片显示 API（Logo / 用户头像）
@@ -21,6 +23,7 @@ const logo_url = ref('/svr/api/image/display/head/logo.png')
 const user_url = ref('/svr/api/image/display/head/tx.png')
 
 const axios = inject('axios') as AxiosInstance // 注入 axios（main.ts 中 provide 的是 AxiosInstance）
+const router = useRouter() // 未登录头像点击后跳登录页
 
 // 用于接收传递组件的数据，此处传递的是菜单选中项索引
 const props = defineProps({ activeIndex: String })
@@ -39,6 +42,10 @@ const token = computed(() => userStore.token)
 // 当前登录用户昵称（头像图缺失时，用昵称首字作为头像兜底）
 const nickname = ref<string>('')
 const nickFirst = computed(() => (nickname.value || '我').slice(0, 1))
+
+// Element Plus Avatar 官方「回退行为」写法：图片加载失败时 @error 返回 true，
+// 组件就会改为渲染默认插槽的内容，而不是留一个破图
+const onAvatarError = () => true
 
 
 // ============================================================================
@@ -101,7 +108,7 @@ function initAvatar() {
         user_url.value = '/svr/api/image/display/head/tx.png'
         userStore.setToken('')
         // 明确告诉用户登录过期了，否则只会看到头像和菜单「莫名其妙消失」
-        ElMessage({ message: '登录已过期，请重新登录', type: 'warning', plain: true })
+        ElMessage.warning('登录已过期，请重新登录')
       }
     })
   }
@@ -134,15 +141,23 @@ onMounted(() => {
       {{ item.name }}
     </el-menu-item>
     <div class="flex-grow" />
-    <!-- 未登录：注册 / 登录 -->
+    <!-- 未登录：官方 Avatar 的「图标」用法（未登录 = 默认用户图标），点击去登录 -->
+    <div v-if="token === ''" class="avatar-slot">
+      <el-avatar
+        class="avatar-login"
+        :size="36"
+        :icon="UserFilled"
+        title="点击登录"
+        @click="router.push('/login')" />
+    </div>
     <el-menu-item v-if="token === ''" index="/register">注册</el-menu-item>
     <el-menu-item v-if="token === ''" index="/login">登录</el-menu-item>
     <!-- 已登录：显示用户中心（头像 + 退出） -->
     <el-sub-menu v-if="token !== ''" index="user-center">
       <template #title>
-        <!-- 头像文件缺失时（如 xm.jpg 根本没放进 images/head）退回「首字」色块，
-             不会在导航栏留一个破图或灰色空圆 -->
-        <el-avatar class="header-avatar" :size="36" :src="user_url">
+        <!-- 按 Element Plus Avatar 官方「回退行为」：图片 404 时 @error 返回 true，
+             改为渲染插槽内容（这里用昵称首字），不会留下破图 -->
+        <el-avatar :size="36" :src="user_url" @error="onAvatarError">
           {{ nickFirst }}
         </el-avatar>
       </template>
@@ -162,12 +177,15 @@ onMounted(() => {
   padding-right: 18px;
 }
 
-/* 导航栏头像：图片缺失时显示「首字」，配色与站点宣纸质一致 */
-.header-avatar {
-  font-size: 12px;
-  color: #7a6449;
-  background: #efe2cc;
-  border: 1px solid #e6d8bf;
+/* 未登录时的默认头像：60px 菜单栏里放 36px，垂直居中、与「注册」留 8px */
+.avatar-slot {
+  display: flex;
+  align-items: center;
+  margin-right: 8px;
+}
+
+.avatar-login {
+  cursor: pointer;
 }
 
 /* 已登录头像在 sub-menu 的标题里，收起一点内边距，避免 50px 头像撑得太开 */

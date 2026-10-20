@@ -3,6 +3,7 @@ import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 // 引入状态管理文件
 import { useTokenStore } from '@/stores/token'
+import { ElMessage } from 'element-plus'
 
 // 创建 Token 状态管理 Store
 const userStore = useTokenStore()
@@ -14,6 +15,8 @@ const router = useRouter()
 onMounted(() => {
   // 设置当前登录用户的 Token 为空（清除登录态，同时清掉 localStorage）
   userStore.setToken('')
+  // 官方 Message 组件：给用户一个明确的「已退出」反馈
+  ElMessage.success('已退出登录')
   // 退出后，跳转至首页
   router.push('/')
 })

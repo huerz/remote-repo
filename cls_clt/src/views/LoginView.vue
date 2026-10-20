@@ -92,11 +92,7 @@ function login() {
     console.log(response.data)
     if (response.data.code == '200') {
       // 提示信息
-      ElMessage({
-        message: '登录成功！',
-        type: 'success',
-        plain: true
-      })
+      ElMessage.success('登录成功！')
       // 获取登录用户的 Token
       const token = response.data.token ?? ''
       userStore.setToken(token)
@@ -104,19 +100,11 @@ function login() {
       router.push('/')
     } else {
       // 后端返回 400/404 时，直接提示后端给的 msg
-      ElMessage({
-        message: response.data.msg || '登录失败！',
-        type: 'error',
-        plain: true
-      })
+      ElMessage.error(response.data.msg || '登录失败！')
     }
   }).catch(function (error) {
     console.log(error)
-    ElMessage({
-      message: '登录失败！',
-      type: 'error',
-      plain: true
-    })
+    ElMessage.error('登录失败！')
   })
 }
 </script>

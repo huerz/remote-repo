@@ -107,28 +107,16 @@ function register() {
   }).then(function (response) {
     if (response.data.code == '200') {
       // 提示信息
-      ElMessage({
-        message: '注册成功！',
-        type: 'success',
-        plain: true
-      })
+      ElMessage.success('注册成功！')
       // 注册成功，跳转至登录页
       router.push('/login')
     } else {
       // 后端返回 400/404 时，直接提示后端给的 msg（如账号重复写入失败）
-      ElMessage({
-        message: response.data.msg || '注册失败！',
-        type: 'error',
-        plain: true
-      })
+      ElMessage.error(response.data.msg || '注册失败！')
     }
   }).catch(function (error) {
     console.log(error)
-    ElMessage({
-      message: '注册失败！',
-      type: 'error',
-      plain: true
-    })
+    ElMessage.error('注册失败！')
   })
 }
 </script>

@@ -89,7 +89,7 @@ function judgeCls(value: number) {
   }).then(function (response) {
     const body = response.data as { code: string; msg: string }
     if (body.code == '200') {
-      ElMessage({ message: '评价成功！', type: 'success', plain: true })
+      ElMessage.success('评价成功！')
       // 重新拉取作品信息，让「评分 / 评价数」立刻反映这次打分
       initCls()
     }
@@ -98,7 +98,7 @@ function judgeCls(value: number) {
     // 鉴权判断：401/422 说明 Token 无效或已过期
     if (error.response && (error.response.status == 401 || error.response.status == 422)) {
       userStore.setToken('')
-      ElMessage({ message: '请重新登录！', type: 'warning', plain: true })
+      ElMessage.warning('请重新登录！')
     }
   })
 }
@@ -137,7 +137,7 @@ function initDis() {
 function pubDiscuss() {
   // 空内容不发请求，直接提示
   if (!comment.value.trim()) {
-    ElMessage({ message: '请先输入书评内容！', type: 'warning', plain: true })
+    ElMessage.warning('请先输入书评内容！')
     return
   }
   const data = {
@@ -162,14 +162,14 @@ function pubDiscuss() {
       // 清空评论信息
       comment.value = ''
       // 提示信息
-      ElMessage({ message: '发表书评成功！', type: 'success', plain: true })
+      ElMessage.success('发表书评成功！')
     }
   }).catch(function (error) {
     console.log(error)
     // 鉴权判断：401/422 说明 Token 无效或已过期
     if (error.response && (error.response.status == 401 || error.response.status == 422)) {
       userStore.setToken('')
-      ElMessage({ message: '请重新登录！', type: 'warning', plain: true })
+      ElMessage.warning('请重新登录！')
     }
   })
 }
@@ -201,13 +201,13 @@ function judgeDiscuss(did: number, judge: number) {
     if (body.code == '200') {
       // 评价成功后，刷新书评列表（顶/踩数量以数据库为准）
       initDis()
-      ElMessage({ message: '评价成功！', type: 'success', plain: true })
+      ElMessage.success('评价成功！')
     }
   }).catch(function (error) {
     console.log(error)
     if (error.response && (error.response.status == 401 || error.response.status == 422)) {
       userStore.setToken('')
-      ElMessage({ message: '请重新登录！', type: 'warning', plain: true })
+      ElMessage.warning('请重新登录！')
     }
   })
 }
@@ -305,10 +305,12 @@ watch(() => route.params.cid, (val) => {
           <!-- 书评列表 -->
           <ul v-else class="discuss-list">
             <li v-for="item in disDatas" :key="item.did" class="discuss-item">
+              <!-- 官方 Avatar「回退行为」：图片 404 时 @error 返回 true，改为渲染插槽（昵称首字） -->
               <el-avatar
                 :size="36"
                 class="discuss-avatar"
-                :src="'/svr/api/image/display/head/' + (item.user.avatar || 'tx.png')">
+                :src="'/svr/api/image/display/head/' + (item.user.avatar || 'tx.png')"
+                @error="() => true">
                 {{ (item.user.nickname || item.user.uname || '?').slice(0, 1) }}
               </el-avatar>
               <div class="discuss-main">
