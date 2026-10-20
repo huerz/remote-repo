@@ -344,9 +344,7 @@ watch(() => route.params.cid, (val) => {
             <el-input
               v-model="comment"
               type="textarea"
-              :autosize="{ minRows: 2, maxRows: 4 }"
-              maxlength="300"
-              show-word-limit
+              :autosize="{ minRows: 2, maxRows: 6 }"
               placeholder="写下你对这部作品的理解……" />
             <div class="discuss-pub-bar">
               <el-button type="primary" @click="pubDiscuss">发表书评</el-button>

@@ -9,6 +9,8 @@ import SearchView from '@/views/SearchView.vue'
 import ClassicListView from '@/views/ClassicListView.vue'
 import ClassicView from '@/views/ClassicView.vue'
 import OutView from '@/views/OutView.vue'
+// 个人中心
+import UserCenterView from '@/views/UserCenterView.vue'
 // 404 兜底页
 import NotFoundView from '@/views/NotFoundView.vue'
 
@@ -46,6 +48,12 @@ const router = createRouter({
       path: '/cls/:cid/:tid',
       name: 'cls',
       component: ClassicView
+    },
+    {
+      // 个人中心：显示头像 / 昵称 / 账号 / 电话，并提供退出
+      path: '/user',
+      name: 'user',
+      component: UserCenterView
     },
     {
       // 退出登录：清 Token 后跳回首页

@@ -141,7 +141,10 @@ onMounted(() => {
       {{ item.name }}
     </el-menu-item>
     <div class="flex-grow" />
-    <!-- 未登录：官方 Avatar 的「图标」用法（未登录 = 默认用户图标），点击去登录 -->
+    <!-- 未登录：注册 / 登录，头像放在最外侧（导航栏最右边） -->
+    <el-menu-item v-if="token === ''" index="/register">注册</el-menu-item>
+    <el-menu-item v-if="token === ''" index="/login">登录</el-menu-item>
+    <!-- 官方 Avatar 的「图标」用法（未登录 = 默认用户图标），点击去登录 -->
     <div v-if="token === ''" class="avatar-slot">
       <el-avatar
         class="avatar-login"
@@ -150,8 +153,6 @@ onMounted(() => {
         title="点击登录"
         @click="router.push('/login')" />
     </div>
-    <el-menu-item v-if="token === ''" index="/register">注册</el-menu-item>
-    <el-menu-item v-if="token === ''" index="/login">登录</el-menu-item>
     <!-- 已登录：显示用户中心（头像 + 退出） -->
     <el-sub-menu v-if="token !== ''" index="user-center">
       <template #title>
@@ -161,7 +162,7 @@ onMounted(() => {
           {{ nickFirst }}
         </el-avatar>
       </template>
-      <el-menu-item index="">用户中心</el-menu-item>
+      <el-menu-item index="/user">用户中心</el-menu-item>
       <el-menu-item index="/out">退出</el-menu-item>
     </el-sub-menu>
   </el-menu>
@@ -174,14 +175,13 @@ onMounted(() => {
 }
 .el-menu-demo {
   border-bottom: 1px solid #e6e6e6;
-  padding-right: 18px;
 }
 
-/* 未登录时的默认头像：60px 菜单栏里放 36px，垂直居中、与「注册」留 8px */
+/* 未登录时的默认头像：放在导航栏最外侧，只留 4px 贴边 */
 .avatar-slot {
   display: flex;
   align-items: center;
-  margin-right: 8px;
+  margin-right: 4px;
 }
 
 .avatar-login {
