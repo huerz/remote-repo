@@ -35,6 +35,10 @@ const userStore = useTokenStore()
 // 那样别的页面清掉 Token 时，这里的菜单还停留在「已登录」，两边不一致）
 const token = computed(() => userStore.token)
 
+// 当前登录用户昵称（头像图缺失时，用昵称首字作为头像兜底）
+const nickname = ref<string>('')
+const nickFirst = computed(() => (nickname.value || '我').slice(0, 1))
+
 // ============================================================================
 // 【接口 2】文学导航 API（首页顶部导航栏的文学作品类型）
 // 调用方式：GET  前端 /svr/api/classics/get-classictypes
@@ -76,11 +80,16 @@ function initAvatar() {
         Authorization: 'Bearer ' + token.value
       }
     }).then(function (response) {
-      const body = response.data as { code: string; data?: { avatar?: string } }
+      const body = response.data as {
+        code: string
+        data?: { avatar?: string; nickname?: string; uname?: string }
+      }
       if (body.code == '200' && body.data) {
         const user = body.data
+        // 记住昵称：头像图缺失时用作兜底文字
+        nickname.value = user.nickname || user.uname || ''
         // 用返回的头像文件名拼出图片地址
-        user_url.value = '/svr/api/image/display/head/' + user.avatar
+        user_url.value = '/svr/api/image/display/head/' + (user.avatar || 'tx.png')
       }
     }).catch(function (error) {
       console.log(error)
@@ -127,7 +136,11 @@ onMounted(() => {
     <!-- 已登录：显示用户中心（头像 + 退出） -->
     <el-sub-menu v-if="token !== ''" index="user-center">
       <template #title>
-        <el-avatar size="small" :src="user_url" />
+        <!-- 头像文件缺失时（如 xm.jpg 根本没放进 images/head）退回「首字」色块，
+             不会在导航栏留一个破图或灰色空圆 -->
+        <el-avatar class="header-avatar" size="small" :src="user_url">
+          {{ nickFirst }}
+        </el-avatar>
       </template>
       <el-menu-item index="">用户中心</el-menu-item>
       <el-menu-item index="/out">退出</el-menu-item>
@@ -142,6 +155,14 @@ onMounted(() => {
 }
 .el-menu-demo {
   border-bottom: 1px solid #e6e6e6;
+}
+
+/* 导航栏头像：图片缺失时显示「首字」，配色与站点宣纸质一致 */
+.header-avatar {
+  font-size: 12px;
+  color: #7a6449;
+  background: #efe2cc;
+  border: 1px solid #e6d8bf;
 }
 
 /* 窄屏：7 个分类 + 注册/登录放不下，会把整页撑出横向滚动条。
