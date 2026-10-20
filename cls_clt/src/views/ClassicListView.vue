@@ -181,7 +181,9 @@ watch(() => route.params.tid, (val) => {
 
 .cls-cover {
   width: 100%;
-  aspect-ratio: 3 / 4;
+  /* 封面原图是 600×870，用 3/4 会被 object-fit:cover 裁掉上下约 8%，
+     这里直接按原图比例开框，等于零裁切 */
+  aspect-ratio: 600 / 870;
   background: #f5eddd;
   display: flex;
   align-items: center;
