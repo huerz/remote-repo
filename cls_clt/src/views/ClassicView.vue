@@ -147,7 +147,7 @@ watch(() => route.params.cid, (val) => {
               <div class="classic-judge">
                 <span class="judge-label">{{ token ? '打个分：' : '登录后可评价：' }}</span>
                 <el-rate
-                  v-if="token === ''"
+                  v-if="!token"
                   disabled
                   v-model="myStar" />
                 <el-rate
@@ -273,6 +273,12 @@ watch(() => route.params.cid, (val) => {
   margin-top: 22px;
   padding-top: 18px;
   border-top: 1px dashed #e6d8bf;
+}
+
+/* 可打分星级：未点亮图标默认近白色，在宣纸底上几乎看不见，统一调深 */
+.classic-judge :deep(.el-rate) {
+  --el-rate-void-color: #cbb693;
+  --el-rate-disabled-void-color: #cbb693;
 }
 
 /* 窄屏：封面在上，信息在下 */
