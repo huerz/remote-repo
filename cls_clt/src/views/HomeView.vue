@@ -154,7 +154,7 @@ const recommendGroups = computed<RecommendGroup[]>(() => {
         <el-input
           v-model="keyword"
           size="large"
-          placeholder="请输入书名、作者关键字，如：静夜思 / 李白"
+          placeholder="书名 / 作者，如：静夜思"
           clearable
           @keyup.enter="searchKeyword">
           <template #prefix>
@@ -520,5 +520,17 @@ const recommendGroups = computed<RecommendGroup[]>(() => {
   object-fit: contain;
   border-radius: 5px;
   box-shadow: 0 8px 20px rgba(90, 58, 34, 0.22);
+}
+
+/* 窄屏：卡片宽度只剩约 195px，若沿用 340px 高度，书封上下会各空出 70px。
+   el-carousel 的 height 是写在 .el-carousel__container 上的内联样式，只能 !important 覆盖 */
+@media (max-width: 760px) {
+  .carousel-wrap :deep(.el-carousel__container) {
+    height: 200px !important;
+  }
+
+  .carousel-wrap :deep(.el-carousel__item > a) {
+    padding: 0 8px;
+  }
 }
 </style>
