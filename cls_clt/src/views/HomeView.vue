@@ -169,7 +169,7 @@ const recommendGroups = computed<RecommendGroup[]>(() => {
       <!--轮播图开始-->
       <!--封面图走【接口 1】图片显示 API：/svr/api/image/display/cls/<该项的 cover 文件名>-->
       <div class="carousel-wrap">
-        <el-carousel :interval="4000" type="card" height="260px">
+        <el-carousel :interval="4000" type="card" height="340px">
           <el-carousel-item v-for="item in carouselDatas" :key="item.cid">
             <!-- 点击轮播图进入作品展示页：/cls/<作品编号>/<类型编号> -->
             <RouterLink :to="'/cls/' + item.cid + '/' + item.tid">
@@ -492,17 +492,32 @@ const recommendGroups = computed<RecommendGroup[]>(() => {
   overflow: visible;
 }
 
-/* 轮播封面：竖版书封按高度铺满、宽度自适应 */
+/* RouterLink 是内联 <a>，高度 auto，会让内部 height:100% 全部失效
+   → 先让它撑满卡片高度，图片的 100% 才有参照 */
+.carousel-wrap :deep(.el-carousel__item > a) {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* card 模式下相邻卡片会贴在一起，补一点内边距当间隔 */
+  padding: 0 14px;
+}
+
+/* 轮播封面：竖版书封按高度铺满、宽度自适应
+   关键：img 必须显式给 width/height 100% + object-fit: contain。
+   只写 width:auto 时，Element Plus 内部的 .el-image__inner 宽度是 100%、
+   高度却是 auto，图片会按容器宽度等比撑高（410×595 撑出 260 的卡片），
+   看起来就像书封被裁掉上下、比例被压扁。 */
 .carousel-img {
   height: 100%;
-  width: auto;
+  width: 100%;
   display: block;
 }
 
 .carousel-img :deep(img) {
   height: 100%;
-  width: auto;
-  max-width: 100%;
+  width: 100%;
+  object-fit: contain;
   border-radius: 5px;
   box-shadow: 0 8px 20px rgba(90, 58, 34, 0.22);
 }

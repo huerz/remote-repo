@@ -143,4 +143,25 @@ onMounted(() => {
 .el-menu-demo {
   border-bottom: 1px solid #e6e6e6;
 }
+
+/* 窄屏：7 个分类 + 注册/登录放不下，会把整页撑出横向滚动条。
+   这里让菜单自己横向滚动（隐藏滚动条），页面宽度保持视口宽，
+   轮播、推荐卡片才能跟着一起正常缩放。 */
+@media (max-width: 760px) {
+  .el-menu-demo {
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-wrap: nowrap;
+  }
+
+  .el-menu-demo::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* 菜单项默认允许收缩，会被压扁成「汉魏…」，这里禁止收缩，改用滚动查看 */
+  .el-menu-demo > .el-menu-item,
+  .el-menu-demo > .el-sub-menu {
+    flex: 0 0 auto;
+  }
+}
 </style>
