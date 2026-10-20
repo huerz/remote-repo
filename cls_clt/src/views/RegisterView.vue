@@ -61,9 +61,10 @@ const rules = reactive<RuleForm>({
 })
 
 // “注册”按钮事件：先校验表单，校验通过再调用注册接口
-async function submitForm(formEl: FormInstance | undefined) {
+function submitForm(formEl: FormInstance | undefined) {
   if (!formEl) return
-  await formEl.validate((valid: boolean) => {
+  // 同登录页：validate(callback) 的 Promise 在校验失败时会 reject，不加 await 就不会抛未捕获错误
+  formEl.validate((valid: boolean) => {
     if (valid) {
       register() // 校验通过，执行注册
     } else {

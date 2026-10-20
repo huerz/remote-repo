@@ -9,6 +9,8 @@ import SearchView from '@/views/SearchView.vue'
 import ClassicListView from '@/views/ClassicListView.vue'
 import ClassicView from '@/views/ClassicView.vue'
 import OutView from '@/views/OutView.vue'
+// 404 兜底页
+import NotFoundView from '@/views/NotFoundView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -50,6 +52,13 @@ const router = createRouter({
       path: '/out',
       name: 'out',
       component: OutView
+    },
+    {
+      // 404 兜底：必须放在最后，匹配所有未定义路径，
+      // 否则访问不存在的地址会渲染成一片空白
+      path: '/:pathMatch(.*)*',
+      name: 'notfound',
+      component: NotFoundView
     }
   ]
 })

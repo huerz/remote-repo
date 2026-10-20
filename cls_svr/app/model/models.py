@@ -24,7 +24,9 @@ class Users(db.Model):
     __table_args__ = {'comment': '用户表'}
     uid: Mapped[int] = mapped_column(Integer, primary_key=True)
     uname: Mapped[str] = mapped_column(VARCHAR(100))
-    upwd: Mapped[str] = mapped_column(VARCHAR(100))
+    # 存 werkzeug 的加盐哈希（形如 scrypt:32768:8:1$...），长度约 160 字符，
+    # 原来的 VARCHAR(100) 装不下，必须放到 255
+    upwd: Mapped[str] = mapped_column(VARCHAR(255))
     nickname: Mapped[Optional[str]] = mapped_column(VARCHAR(100))
     
     avatar: Mapped[Optional[str]] = mapped_column(VARCHAR(200))

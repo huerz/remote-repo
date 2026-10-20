@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, inject } from 'vue'
+import { ref, watch, inject, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { AxiosInstance } from 'axios'
@@ -14,9 +14,10 @@ import FooterComp from '@/components/FooterComp.vue'
 const axios = inject('axios') as AxiosInstance // 注入 axios
 const route = useRoute()
 
-// 创建 Token 状态管理 Store，并读取当前登录用户的 Token
+// 创建 Token 状态管理 Store
 const userStore = useTokenStore()
-const token = ref<string>(userStore.getToken())
+// 登录态直接跟随 Store（不要 ref 拷贝：清 token 时头部与详情页会不一致）
+const token = computed(() => userStore.token)
 
 // 文学作品编号 / 类型编号
 const cid = ref<string>('')
@@ -96,7 +97,6 @@ function judgeCls(value: number) {
     console.log(error)
     // 鉴权判断：401/422 说明 Token 无效或已过期
     if (error.response && (error.response.status == 401 || error.response.status == 422)) {
-      token.value = ''
       userStore.setToken('')
       ElMessage({ message: '请重新登录！', type: 'warning', plain: true })
     }
@@ -168,7 +168,6 @@ function pubDiscuss() {
     console.log(error)
     // 鉴权判断：401/422 说明 Token 无效或已过期
     if (error.response && (error.response.status == 401 || error.response.status == 422)) {
-      token.value = ''
       userStore.setToken('')
       ElMessage({ message: '请重新登录！', type: 'warning', plain: true })
     }
@@ -207,7 +206,6 @@ function judgeDiscuss(did: number, judge: number) {
   }).catch(function (error) {
     console.log(error)
     if (error.response && (error.response.status == 401 || error.response.status == 422)) {
-      token.value = ''
       userStore.setToken('')
       ElMessage({ message: '请重新登录！', type: 'warning', plain: true })
     }

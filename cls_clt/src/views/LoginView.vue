@@ -49,9 +49,11 @@ const rules = reactive<FormRules<DataForm>>({
 })
 
 // “登录”按钮事件
-const submitForm = async (formEl: FormInstance | undefined) => {
+const submitForm = (formEl: FormInstance | undefined) => {
   if (!formEl) return
-  await formEl.validate((valid: boolean, fields) => {
+  // 注意：validate(callback) 同时返回 Promise，校验不通过时这个 Promise 会 reject；
+  // 这里不加 await，避免冒出一个没人处理的 Promise 错误（控制台会飘红）
+  formEl.validate((valid: boolean, fields) => {
     if (valid) {
       login() // 用户登录操作
     } else {

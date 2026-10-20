@@ -1,10 +1,16 @@
 from flask import Blueprint, request
 from flask import jsonify
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
+from werkzeug.security import generate_password_hash, check_password_hash
+import re
 
 # 引入数据库操作类
 from app.dao.UsersDao import UsersDao
 from app.model.models import Users, UsersSchema
+
+# 账号格式：3~20 位字母、数字、下划线（数据库 uname 是 VARCHAR(100)，
+# 不校验长度会让超长账号直接触发数据库报错，变成 500）
+UNAME_RE = re.compile(r'^[A-Za-z0-9_]{3,20}$')
 
 # ============================================================================
 # 本文件接口清单（蓝图前缀 /api/user，在 run.py 注册时指定）
@@ -19,7 +25,8 @@ from app.model.models import Users, UsersSchema
 #
 #   GET  /api/user/get-user   查询登录用户信息（需 JWT 认证，教材 6.2）
 #        请求头：Authorization: Bearer <token>
-#        返回：{code, msg, data:{uid, uname, upwd, nickname, avatar, sex, phone, remark}}
+#        返回：{code, msg, data:{uid, uname, nickname, avatar, sex, phone, remark}}
+#        （不返回 upwd：密码属于敏感字段，绝不能下发到前端）
 #
 #   GET  /api/user/protected  受保护路由（需 JWT 认证）
 #        请求头：Authorization: Bearer <token>
@@ -69,6 +76,24 @@ def register():
         result_msg["msg"] = "账号和密码不能为空！"
         return jsonify(result_msg)
 
+    # 格式与长度校验（不校验的话，超长内容会直接触发数据库报错变成 500）
+    if not UNAME_RE.match(uname):
+        result_msg["code"] = "400"
+        result_msg["msg"] = "账号只能是 3~20 位字母、数字或下划线！"
+        return jsonify(result_msg)
+    if not 6 <= len(upwd) <= 32:
+        result_msg["code"] = "400"
+        result_msg["msg"] = "密码长度需为 6~32 位！"
+        return jsonify(result_msg)
+    if nickname and len(nickname) > 20:
+        result_msg["code"] = "400"
+        result_msg["msg"] = "昵称不能超过 20 个字！"
+        return jsonify(result_msg)
+    if phone and not re.match(r'^\d{6,20}$', phone):
+        result_msg["code"] = "400"
+        result_msg["msg"] = "电话号码格式不正确！"
+        return jsonify(result_msg)
+
     # 创建数据库操作对象
     db_op = UsersDao()
 
@@ -79,8 +104,9 @@ def register():
         return jsonify(result_msg)
 
     # 新建用户对象，将用户写入数据库
-    user = Users(uname=uname, upwd=upwd, nickname=nickname, avatar=avatar,
-                 sex=sex, phone=phone)
+    # 密码不存明文：用 werkzeug 的加盐哈希（同一密码每次哈希结果都不同）
+    user = Users(uname=uname, upwd=generate_password_hash(upwd), nickname=nickname,
+                 avatar=avatar, sex=sex, phone=phone)
     flag = db_op.addUser(user)  # 增加用户
     if flag:
         result_msg["code"] = "200"
@@ -126,8 +152,21 @@ def login():
     db_op = UsersDao()
     user = db_op.getUserByUname(uname)
 
+    # 密码校验：库里存的可能是哈希（新注册的用户），也可能是明文（历史数据）
+    #   - 哈希：用 check_password_hash 校验
+    #   - 明文：直接比对，比对成功后立刻升级成哈希（无需人工迁移老数据）
+    passed = False
+    if user is not None:
+        stored = user.upwd or ''
+        if stored.startswith(('pbkdf2:', 'scrypt:')):
+            passed = check_password_hash(stored, upwd)
+        else:
+            passed = (stored == upwd)
+            if passed:
+                db_op.updatePassword(user.uid, generate_password_hash(upwd))
+
     # 判断是否登录成功
-    if user is not None and user.upwd == upwd:
+    if passed:
         result_msg["code"] = "200"
         result_msg["msg"] = "操作成功！"
 

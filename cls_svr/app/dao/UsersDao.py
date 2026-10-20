@@ -38,3 +38,17 @@ class UsersDao:
         except Exception as e:
             print(e)
             pass
+
+    # 5.更新密码（把存量明文密码升级成哈希时使用）
+    def updatePassword(self, uid, upwd_hash):
+        try:
+            user = Users.query.get(uid)
+            if user is None:
+                return False
+            user.upwd = upwd_hash
+            db.session.commit()
+            return True
+        except Exception as e:
+            print(e)
+            db.session.rollback()
+            return False

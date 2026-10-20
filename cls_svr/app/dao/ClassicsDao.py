@@ -1,5 +1,6 @@
 from app import db
 from app.model.models import Classictype, Classics, Discuss
+from app.model.models import Classicjudges, Discussjudges
 
 # 数据库操作类
 class ClassicsDao:
@@ -33,13 +34,15 @@ class ClassicsDao:
         try:
             if keyword is None:
                 keyword = ''
-            like_value = '%' + keyword + '%'
+            # 转义 LIKE 的通配符：否则用户输入 % 会命中全部、输入 _ 会匹配任意单字符
+            safe = keyword.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+            like_value = '%' + safe + '%'
             classics = Classics.query.join(
                 Classictype, Classics.tid == Classictype.tid
             ).filter(
-                db.or_(Classics.title.like(like_value),
-                       Classics.author.like(like_value),
-                       Classictype.name.like(like_value))
+                db.or_(Classics.title.like(like_value, escape='\\'),
+                       Classics.author.like(like_value, escape='\\'),
+                       Classictype.name.like(like_value, escape='\\'))
             ).order_by(Classics.rating.desc(), Classics.cid.asc()).all()
             return classics
         except Exception as e:
@@ -79,6 +82,7 @@ class ClassicsDao:
     #    注意单位：前端提交的是 1~5 星，classics.rating 存的是 0~100 分
     #    （前端展示时 rating/20 换算成 5 星），所以这里必须先 ×20 再比较，
     #    否则 max(5, 90) 永远等于原值，用户的评价等于白打。
+    #    同一用户对同一作品重复打分时，只更新原记录，不再插新行（否则评价表无限膨胀）
     def updateClassicRating(self, judge):
         flag = True  # 成功标志
         try:
@@ -86,12 +90,21 @@ class ClassicsDao:
             classics = Classics.query.get(judge.cid)
             # 星级换算成百分制
             new_rating = judge.rating * 20
+            # 判断该用户是否已评价过这部作品
+            old = Classicjudges.query.filter(
+                Classicjudges.cid == judge.cid,
+                Classicjudges.uid == judge.uid
+            ).first()
+            if old is not None:
+                # 已评价过：覆盖原记录，评价数不再 +1
+                old.rating = judge.rating
+                old.jdate = judge.jdate
+            else:
+                # 首次评价：评价数 +1，插入新记录
+                classics.commentscount = (classics.commentscount or 0) + 1
+                db.session.add(judge)
             # 设置文学作品星级（取最高评分）
             classics.rating = max(new_rating, classics.rating or 0)
-            # 评价数 +1（前端详情页要展示评价人数）
-            classics.commentscount = (classics.commentscount or 0) + 1
-            # 将评价信息加入文学评价表
-            db.session.add(judge)
             db.session.commit()  # 提交至数据库
         except Exception as e:
             flag = False
@@ -130,22 +143,47 @@ class ClassicsDao:
 
     # 10. 评价书评（教材 7.3.3）
     #     toplow=1 记「顶」，toplow=0 记「踩」；同时把这条评价写进评论评价表
-    #     注意：discuss 的 topcount/lowcount 允许为 NULL，累加前要兜底成 0
+    #     同一用户对同一条书评只保留一条记录：
+    #       - 同方向重复提交 → 返回 'repeat'（不重复累加，否则一个人能顶 100 次）
+    #       - 反方向提交     → 改判，原方向计数 -1、新方向计数 +1
+    #     返回值：'ok' 成功 / 'repeat' 重复 / 'fail' 异常
     def updateDiscussTopLow(self, judge):
-        flag = True  # 成功标志
         try:
             # 查询书评信息
             dis = Discuss.query.get(judge.did)
-            # 设置书评的顶、踩的数量
+            if dis is None:
+                return 'fail'
+            # 查询该用户对这条书评的历史评价
+            old = Discussjudges.query.filter(
+                Discussjudges.did == judge.did,
+                Discussjudges.uid == judge.uid
+            ).first()
+
+            if old is not None and old.toplow == judge.toplow:
+                # 同方向重复：直接告诉前端「已经评价过」
+                return 'repeat'
+
+            if old is not None:
+                # 反方向改判：先把旧方向的计数减回去
+                if old.toplow == 1:
+                    dis.topcount = max((dis.topcount or 0) - 1, 0)
+                else:
+                    dis.lowcount = max((dis.lowcount or 0) - 1, 0)
+                old.toplow = judge.toplow
+                old.jdate = judge.jdate
+            else:
+                # 首次评价：插入新记录
+                db.session.add(judge)
+
+            # 新方向计数 +1
             if judge.toplow == 1:
                 dis.topcount = (dis.topcount or 0) + 1
             else:
                 dis.lowcount = (dis.lowcount or 0) + 1
-            # 将评价信息插入评论评价表
-            db.session.add(judge)
+
             db.session.commit()  # 提交至数据库
+            return 'ok'
         except Exception as e:
-            flag = False
             print(e)
             db.session.rollback()  # 异常，回滚数据库
-        return flag
+            return 'fail'

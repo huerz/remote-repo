@@ -116,8 +116,15 @@ def search_carousels(number):
 def search_classics():
     # 返回信息
     result_msg = {"code": "200", "msg": "操作成功！"}
-    # 获取 JSON 格式的请求体
-    request_body = request.get_json()
+    # 获取 JSON 格式的请求体（silent=True：非法 JSON 返回 None，与其它接口保持一致，
+    # 不会抛 Flask 默认的 HTML 400）
+    request_body = request.get_json(silent=True)
+    # 传了请求体但解析不出来 → 属于参数错误；
+    # 完全不传请求体时才按「空关键字 = 查全部」处理
+    if request_body is None and request.data:
+        result_msg["code"] = "404"
+        result_msg["msg"] = "参数错误"
+        return jsonify(result_msg)
     # 关键字为空时按空串处理（返回全部数据）
     keyword = ''
     if request_body is not None and request_body.get('keyword') is not None:
@@ -398,12 +405,17 @@ def judgeDiscuss():
     judge = Discussjudges(did=did, uid=uid, toplow=toplow, jdate=jdate)
 
     # 创建数据库操作对象，评价书评
+    # 返回值：'ok' 成功 / 'repeat' 同方向重复提交 / 'fail' 失败
     db_op = ClassicsDao()
     flag = db_op.updateDiscussTopLow(judge)
 
-    if flag:
+    if flag == 'ok':
         result_msg["code"] = "200"
         result_msg["msg"] = "操作成功！"
+    elif flag == 'repeat':
+        # 同一个人对同一条书评反复点同一边，不再累加计数
+        result_msg["code"] = "400"
+        result_msg["msg"] = "你已经评价过这条书评了！"
     else:
         result_msg["code"] = "404"
         result_msg["msg"] = "操作失败！"

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, inject, onMounted } from 'vue'
+import { ref, inject, onMounted, computed } from 'vue'
 import type { AxiosInstance } from 'axios'
 import type { ApiResult, Classictype } from '@/types'
 // 引入 Token 状态管理
@@ -9,7 +9,7 @@ import { useTokenStore } from '@/stores/token'
 // 【接口 1】图片显示 API（Logo / 用户头像）
 // 调用方式：GET  前端 /svr/api/image/display/head/logo.png
 //                 后端 http://127.0.0.1:5382/api/image/display/head/logo.png
-// 说明：/svr 是 vite.config.js 里配置的代理前缀，转发到 5000 并去掉该前缀
+// 说明：/svr 是 vite.config.ts 里配置的代理前缀，转发到 5382 并去掉该前缀
 // 路径参数：
 //   type     = head（用户头像类） / cls（文学作品封面类）
 //   filename = 图片文件名，如 logo.png、tx.png
@@ -31,8 +31,9 @@ const navDatas = ref<Classictype[]>([])
 
 // 创建 Token 状态管理 Store
 const userStore = useTokenStore()
-// 获取登录用户的 Token（空串表示未登录）
-const token = ref<string>(userStore.getToken())
+// 登录态直接跟随 Store（不要用 ref 拷贝一份值：
+// 那样别的页面清掉 Token 时，这里的菜单还停留在「已登录」，两边不一致）
+const token = computed(() => userStore.token)
 
 // ============================================================================
 // 【接口 2】文学导航 API（首页顶部导航栏的文学作品类型）
@@ -87,7 +88,6 @@ function initAvatar() {
       if (error.response && (error.response.status == 401 || error.response.status == 422)) {
         // 没有权限或权限已过期，设置 Token 为空
         user_url.value = '/svr/api/image/display/head/tx.png'
-        token.value = ''
         userStore.setToken('')
       }
     })
