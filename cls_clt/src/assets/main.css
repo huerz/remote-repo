@@ -1,0 +1,22 @@
+/* 全局样式表 */
+/* 用 html:root 提高权重：本文件在 main.js 中先于 element-plus 样式引入，
+   只写 :root 会被 Element Plus 的默认主色覆盖 */
+html:root {
+  /* Element Plus 主色统一为站点朱红：菜单选中、按钮、输入框聚焦、单选框都跟随，
+     避免组件默认蓝色与宣纸+朱红的整体风格冲突 */
+  --el-color-primary: #a8352c;
+  --el-menu-active-color: #a8352c;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+#app {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  text-align: center;
+}

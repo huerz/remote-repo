@@ -1,0 +1,10 @@
+# hi_db / classicsdb Flask 项目依赖（已验证可用组合）
+# 安装：pip install -r requirements.txt
+Flask==3.1.3
+Flask-SQLAlchemy==3.1.1
+flask-marshmallow==1.5.0
+marshmallow==4.3.1
+marshmallow-sqlalchemy==1.5.0
+PyMySQL==1.2.3
+SQLAlchemy==2.1.4
+Werkzeug==3.1.9
