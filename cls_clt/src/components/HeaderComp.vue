@@ -39,6 +39,9 @@ const token = computed(() => userStore.token)
 const nickname = ref<string>('')
 const nickFirst = computed(() => (nickname.value || '我').slice(0, 1))
 
+// 未登录时的默认头像（圆形占位图，与已登录头像同款）
+const circleUrl = ref('/svr/api/image/display/head/tx.png')
+
 // ============================================================================
 // 【接口 2】文学导航 API（首页顶部导航栏的文学作品类型）
 // 调用方式：GET  前端 /svr/api/classics/get-classictypes
@@ -130,7 +133,10 @@ onMounted(() => {
       {{ item.name }}
     </el-menu-item>
     <div class="flex-grow" />
-    <!-- 未登录：显示注册 / 登录 -->
+    <!-- 未登录：默认头像（size=50）+ 注册 / 登录 -->
+    <div v-if="token === ''" class="avatar-slot">
+      <el-avatar :size="50" :src="circleUrl">客</el-avatar>
+    </div>
     <el-menu-item v-if="token === ''" index="/register">注册</el-menu-item>
     <el-menu-item v-if="token === ''" index="/login">登录</el-menu-item>
     <!-- 已登录：显示用户中心（头像 + 退出） -->
@@ -138,7 +144,7 @@ onMounted(() => {
       <template #title>
         <!-- 头像文件缺失时（如 xm.jpg 根本没放进 images/head）退回「首字」色块，
              不会在导航栏留一个破图或灰色空圆 -->
-        <el-avatar class="header-avatar" size="small" :src="user_url">
+        <el-avatar class="header-avatar" :size="50" :src="user_url">
           {{ nickFirst }}
         </el-avatar>
       </template>
@@ -163,6 +169,18 @@ onMounted(() => {
   color: #7a6449;
   background: #efe2cc;
   border: 1px solid #e6d8bf;
+}
+
+/* 未登录时的默认头像：50px 塞进 60px 高的菜单栏，垂直居中 + 右侧留白 */
+.avatar-slot {
+  display: flex;
+  align-items: center;
+  margin-right: 10px;
+}
+
+/* 已登录头像在 sub-menu 的标题里，收起一点内边距，避免 50px 头像撑得太开 */
+.el-menu-demo .el-sub-menu__title {
+  padding-right: 12px;
 }
 
 /* 窄屏：7 个分类 + 注册/登录放不下，会把整页撑出横向滚动条。
