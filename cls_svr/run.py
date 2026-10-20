@@ -12,6 +12,9 @@
 #                                                    GET  /get-classics/<tid>
 #                                                    GET  /get-classic/<cid>
 #                                                    POST /judge-classic（需 JWT）
+#                                                    GET  /get-discuss/<cid>（书评展示）
+#                                                    POST /pub-discuss（需 JWT，发表书评）
+#                                                    POST /judge-discuss（需 JWT，书评顶/踩）
 # /api/image        app/api/image_blueprint.py       GET  /display/<type>/<filename>
 #                   （该蓝图在 app/__init__.py 的 create_app() 里注册）
 # ----------------------------------------------------------------------------

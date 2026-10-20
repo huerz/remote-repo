@@ -1,5 +1,5 @@
 from app import db
-from app.model.models import Classictype, Classics
+from app.model.models import Classictype, Classics, Discuss
 
 # 数据库操作类
 class ClassicsDao:
@@ -91,6 +91,57 @@ class ClassicsDao:
             # 评价数 +1（前端详情页要展示评价人数）
             classics.commentscount = (classics.commentscount or 0) + 1
             # 将评价信息加入文学评价表
+            db.session.add(judge)
+            db.session.commit()  # 提交至数据库
+        except Exception as e:
+            flag = False
+            print(e)
+            db.session.rollback()  # 异常，回滚数据库
+        return flag
+
+    # 8. 获取某文学作品的评论列表（教材 7.3.1）
+    #    按评论时间从高到低排序，最新的书评排在最前面
+    def getDiscussByCid(self, cid):
+        try:
+            discuss = Discuss.query.filter(Discuss.cid == cid) \
+                .order_by(Discuss.cdate.desc()).all()
+            return discuss
+        except Exception as e:
+            print(e)
+            pass
+
+    # 9. 发表文学评论（教材 7.3.2）
+    #    向评论表插入一条记录，并把作品的评论数 +1
+    def addDiscuss(self, discuss):
+        flag = True  # 成功标志
+        try:
+            # 查询对应的文学作品
+            classic = Classics.query.get(discuss.cid)
+            # 设置作品的评论数量 +1
+            classic.commentscount = (classic.commentscount or 0) + 1
+            # 把评论加入文学评论表
+            db.session.add(discuss)
+            db.session.commit()  # 提交至数据库
+        except Exception as e:
+            flag = False
+            print(e)
+            db.session.rollback()  # 异常，回滚数据库
+        return flag
+
+    # 10. 评价书评（教材 7.3.3）
+    #     toplow=1 记「顶」，toplow=0 记「踩」；同时把这条评价写进评论评价表
+    #     注意：discuss 的 topcount/lowcount 允许为 NULL，累加前要兜底成 0
+    def updateDiscussTopLow(self, judge):
+        flag = True  # 成功标志
+        try:
+            # 查询书评信息
+            dis = Discuss.query.get(judge.did)
+            # 设置书评的顶、踩的数量
+            if judge.toplow == 1:
+                dis.topcount = (dis.topcount or 0) + 1
+            else:
+                dis.lowcount = (dis.lowcount or 0) + 1
+            # 将评价信息插入评论评价表
             db.session.add(judge)
             db.session.commit()  # 提交至数据库
         except Exception as e:

@@ -4,9 +4,12 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 import datetime
 # 引入数据库操作类
 from app.dao.ClassicsDao import ClassicsDao
+from app.dao.UsersDao import UsersDao
 from app.model.models import Classictype, ClassictypeSchema
 from app.model.models import Classics, ClassicsSchema
 from app.model.models import Classicjudges
+from app.model.models import Discuss, Discussjudges
+from app.model.models import Users, UsersSchema
 
 # ============================================================================
 # 本文件接口清单（蓝图前缀 /api/classics，在 run.py 注册时指定）
@@ -34,6 +37,21 @@ from app.model.models import Classicjudges
 #   6) POST /api/classics/judge-classic           文学评价（教材 6.3.5，需 JWT）
 #          请求头：Authorization: Bearer <token>
 #          请求体：{"cid": 作品编号, "star": 星级 1-5}
+#          返回：{code, msg}
+#
+#   7) GET  /api/classics/get-discuss/<cid>       书评展示（教材 7.3.1）
+#          参数：路径参数 cid（作品编号）
+#          返回：{code, msg, data:[{did, cid, comment, cdate, topcount, lowcount,
+#                                  user:{uid, uname, nickname, avatar, ...}}]}
+#
+#   8) POST /api/classics/pub-discuss             发表书评（教材 7.3.2，需 JWT）
+#          请求头：Authorization: Bearer <token>
+#          请求体：{"cid": 作品编号, "comment": 书评内容}
+#          返回：{code, msg}
+#
+#   9) POST /api/classics/judge-discuss           书评评价·顶/踩（教材 7.3.3，需 JWT）
+#          请求头：Authorization: Bearer <token>
+#          请求体：{"did": 评论编号, "toplow": 0 踩 / 1 顶}
 #          返回：{code, msg}
 # ----------------------------------------------------------------------------
 # 前端（cls_clt，端口 5173）调用时必须加代理前缀 /svr，
@@ -229,6 +247,159 @@ def judgeClassic():
     # 创建数据库操作对象，评价文学作品
     db_op = ClassicsDao()
     flag = db_op.updateClassicRating(judge)
+
+    if flag:
+        result_msg["code"] = "200"
+        result_msg["msg"] = "操作成功！"
+    else:
+        result_msg["code"] = "404"
+        result_msg["msg"] = "操作失败！"
+
+    # 返回操作结果
+    return jsonify(result_msg)
+# ============================================================================
+# 【接口 7】书评展示 API（教材 7.3.1）
+# 调用方式：GET /api/classics/get-discuss/<cid>
+# 参数：路径参数 cid —— 文学作品编号
+# 返回：{code:'200', msg:'操作成功！', data:[{did, cid, comment, cdate,
+#         topcount, lowcount, user:{uid, uname, nickname, avatar, sex, phone, remark}}]}
+# 说明：先按 cid 查评论表，再逐条查评论人信息，一起包装成前端要的结构
+# ============================================================================
+@classics_blueprint.route('/get-discuss/<int:cid>')
+def get_discuss(cid):
+    # 返回信息
+    result_msg = {"code": "200", "msg": "操作成功！"}
+
+    # 创建数据库操作对象
+    db_dis = ClassicsDao()
+    db_usr = UsersDao()
+
+    # 查询该作品的评论列表（按时间倒序）
+    discuss = db_dis.getDiscussByCid(cid)
+
+    # 循环取出文学评论，并封装评论用户数据
+    dis_list = []
+    for dis in (discuss or []):
+        # 获取用户编号，查询用户信息
+        uid = dis.uid
+        user = db_usr.getUserByUid(uid)
+
+        # 构建返回数据
+        # 时间统一转成 "YYYY-MM-DD HH:MM" 再返回：
+        # Flask 默认会把 datetime 序列化成 HTTP 日期串（Tue, 20 Oct 2026 17:11:23 GMT），
+        # 但那串里的时间是本地时间却被标成 GMT，浏览器再按本地时区解析会整体偏移 8 小时。
+        cdate = dis.cdate.strftime("%Y-%m-%d %H:%M") if dis.cdate else None
+        dis_tmp = {"did": dis.did, "comment": dis.comment, "cdate": cdate,
+                   "topcount": dis.topcount, "lowcount": dis.lowcount,
+                   "cid": dis.cid}
+
+        # 用 UsersSchema 将数据转换为字典格式（不含密码字段）
+        if user is not None:
+            users_schema = UsersSchema()
+            dis_tmp["user"] = users_schema.dump(user)
+        else:
+            # 用户被删了也要能显示评论，避免整条数据丢掉
+            dis_tmp["user"] = {"uid": uid, "uname": "已注销", "nickname": "已注销用户",
+                               "avatar": "tx.png", "sex": None, "phone": None,
+                               "remark": None}
+
+        # 将构建好的文学评论列表加入返回列表
+        dis_list.append(dis_tmp)
+
+    # 将转换后的 JSON 格式的数据存储至返回结果
+    result_msg["data"] = dis_list
+    return jsonify(result_msg)
+
+
+# ============================================================================
+# 【接口 8】发表书评 API（教材 7.3.2，需 JWT）
+# 调用方式：POST /api/classics/pub-discuss
+# 请求头：Authorization: Bearer <token>
+# 请求体：{"cid": 作品编号, "comment": 书评内容}
+# 返回：{code:'200', msg:'操作成功！'} / {code:'404', msg:'参数错误'}
+# ============================================================================
+@classics_blueprint.route('/pub-discuss', methods=["POST"])
+@jwt_required()  # 用户身份鉴权
+def pubDiscuss():
+    # 返回信息
+    result_msg = {"code": "200", "msg": "操作成功！"}
+
+    # 获取并解析 JSON 格式的请求
+    request_body = request.get_json(silent=True)
+    if request_body is None:
+        result_msg["code"] = "404"
+        result_msg["msg"] = "参数错误"
+        return jsonify(result_msg)
+
+    # 获取书评数据
+    cid = request_body.get("cid")            # 文学作品编号
+    comment = request_body.get("comment")    # 书评内容
+    if cid is None or not comment:
+        result_msg["code"] = "404"
+        result_msg["msg"] = "参数错误"
+        return jsonify(result_msg)
+
+    # 获取认证的用户编号（登录时通过 uid 生成 Token）
+    uid = int(get_jwt_identity())
+    cdate = datetime.datetime.now()
+
+    # 新建评论对象
+    discuss = Discuss(cid=cid, uid=uid, comment=comment, cdate=cdate,
+                      topcount=0, lowcount=0)
+
+    # 创建数据库操作对象，发表书评
+    db_op = ClassicsDao()
+    flag = db_op.addDiscuss(discuss)
+
+    if flag:
+        result_msg["code"] = "200"
+        result_msg["msg"] = "操作成功！"
+    else:
+        result_msg["code"] = "404"
+        result_msg["msg"] = "操作失败！"
+
+    # 返回操作结果
+    return jsonify(result_msg)
+
+
+# ============================================================================
+# 【接口 9】书评评价 API（教材 7.3.3，需 JWT）
+# 调用方式：POST /api/classics/judge-discuss
+# 请求头：Authorization: Bearer <token>
+# 请求体：{"did": 评论编号, "toplow": 0 表示踩 / 1 表示顶}
+# 返回：{code:'200', msg:'操作成功！'} / {code:'404', msg:'参数错误'}
+# ============================================================================
+@classics_blueprint.route('/judge-discuss', methods=["POST"])
+@jwt_required()  # 用户身份鉴权
+def judgeDiscuss():
+    # 返回信息
+    result_msg = {"code": "200", "msg": "操作成功！"}
+
+    # 获取并解析 JSON 格式的请求
+    request_body = request.get_json(silent=True)
+    if request_body is None:
+        result_msg["code"] = "404"
+        result_msg["msg"] = "参数错误"
+        return jsonify(result_msg)
+
+    # 获取评价数据
+    did = request_body.get("did")          # 评论编号
+    toplow = request_body.get("toplow")    # 评价标志
+    if did is None or toplow is None:
+        result_msg["code"] = "404"
+        result_msg["msg"] = "参数错误"
+        return jsonify(result_msg)
+
+    # 获取认证的用户编号
+    uid = int(get_jwt_identity())
+    jdate = datetime.datetime.now()
+
+    # 新建评价对象
+    judge = Discussjudges(did=did, uid=uid, toplow=toplow, jdate=jdate)
+
+    # 创建数据库操作对象，评价书评
+    db_op = ClassicsDao()
+    flag = db_op.updateDiscussTopLow(judge)
 
     if flag:
         result_msg["code"] = "200"

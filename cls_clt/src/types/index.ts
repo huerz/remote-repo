@@ -32,6 +32,29 @@ export interface ApiResult<T> {
   data: T
 }
 
+// 评论用户（后端 UsersSchema 序列化结果，注意不含密码字段）
+export interface DiscussUser {
+  uid: number
+  uname: string
+  nickname: string | null
+  avatar: string | null
+  sex: string | null
+  phone: string | null
+  remark: string | null
+}
+
+// 文学书评（对应后端 discuss 表 / GET /api/classics/get-discuss/<cid>）
+// cdate 后端统一格式化为 "YYYY-MM-DD HH:MM"
+export interface Discuss {
+  did: number
+  cid: number
+  comment: string | null
+  cdate: string | null
+  topcount: number | null
+  lowcount: number | null
+  user: DiscussUser
+}
+
 // 首页推荐区按类型分组后的结构
 export interface RecommendGroup {
   tid: number
