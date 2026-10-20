@@ -135,7 +135,7 @@ onMounted(() => {
     <div class="flex-grow" />
     <!-- 未登录：默认头像（size=50）+ 注册 / 登录 -->
     <div v-if="token === ''" class="avatar-slot">
-      <el-avatar :size="50" :src="circleUrl">客</el-avatar>
+      <el-avatar :size="36" :src="circleUrl">客</el-avatar>
     </div>
     <el-menu-item v-if="token === ''" index="/register">注册</el-menu-item>
     <el-menu-item v-if="token === ''" index="/login">登录</el-menu-item>
@@ -144,7 +144,7 @@ onMounted(() => {
       <template #title>
         <!-- 头像文件缺失时（如 xm.jpg 根本没放进 images/head）退回「首字」色块，
              不会在导航栏留一个破图或灰色空圆 -->
-        <el-avatar class="header-avatar" :size="50" :src="user_url">
+        <el-avatar class="header-avatar" :size="36" :src="user_url">
           {{ nickFirst }}
         </el-avatar>
       </template>
@@ -161,6 +161,7 @@ onMounted(() => {
 }
 .el-menu-demo {
   border-bottom: 1px solid #e6e6e6;
+  padding-right: 18px;
 }
 
 /* 导航栏头像：图片缺失时显示「首字」，配色与站点宣纸质一致 */
@@ -171,7 +172,8 @@ onMounted(() => {
   border: 1px solid #e6d8bf;
 }
 
-/* 未登录时的默认头像：50px 塞进 60px 高的菜单栏，垂直居中 + 右侧留白 */
+/* 未登录时的默认头像：60px 的菜单栏里放 36px，上下各留 12px 才不顶满；
+   与右侧「注册/登录」之间留 10px */
 .avatar-slot {
   display: flex;
   align-items: center;
