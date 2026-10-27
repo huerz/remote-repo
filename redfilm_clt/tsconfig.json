@@ -1,0 +1,38 @@
+{
+  "compilerOptions": {
+    /* 目标与模块：现代浏览器 + Vite 的 ESM 打包方式 */
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+
+    /* 类型检查：严格模式，和教材的 TS 写法保持一致 */
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "useDefineForClassFields": true,
+
+    /* 全局类型：node（vite.config.ts 用）+ Element Plus 组件全局类型（模板里 el-xxx 有提示） */
+    "types": ["node", "element-plus/global"],
+
+    /* 路径别名：@ 指向 src，与 vite.config.ts 里的 alias 对应
+       注意：不要写 "baseUrl"，它已废弃且 TypeScript 7.0 起不再支持；
+       现在 paths 直接相对本文件所在目录解析，写成 "./src/*" 即可 */
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": [
+    "env.d.ts",
+    "vite.config.ts",
+    "src/**/*.ts",
+    "src/**/*.d.ts",
+    "src/**/*.vue"
+  ],
+  "exclude": ["node_modules", "dist"]
+}
