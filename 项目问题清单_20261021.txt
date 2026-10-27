@@ -1,0 +1,306 @@
+﻿========================================================================
+古典文学网 · 项目问题清单
+========================================================================
+项目目录：D:\高级网页设计
+涉及项目：cls_svr（Flask 后端）、cls_clt（Vue3 前端）、
+          hi_flash（7.2 示例）、Hi_upload（8.2 示例）、Hi_view（6.2 示例）
+生成时间：2026-10-21 15:04
+更新时间：2026-10-27 10:55（第 2 版，逐条复查当前源码）
+说明：第 1 版记录「先按书本实现」后的遗留状态。
+      第 2 版对全部 27 项逐条核对源码，标注当前状态并给出文件:行号证据。
+      行号基准为 2026-10-27 10:55 的代码（当日做过注释格式统一，业务逻辑未变）。
+========================================================================
+
+
+一、复查结论（2026-10-27）
+------------------------------------------------------------------------
+27 项中：已修复 3 项，部分修复 3 项，仍存在 20 项，未复查 1 项（L3）。
+
+[已修复]
+  M12  用户中心 el-sub-menu 空 index
+       现状：导航栏已重构为 el-dropdown + handleCommand，模板内无 el-sub-menu 元素。
+       遗留：Logo 的 <el-menu-item index=""> 仍为空字符串（HeaderComp.vue:136），
+             不触发路由跳转，无实际影响。
+  L4   没有 git 版本管理
+       现状：已 git init，3 次提交，最新 ae907b6。
+       遗留：git status 显示 146 项未提交/未跟踪，建议分批提交。
+  L5   MySQL84 未常驻
+       现状：3306 已监听（0.0.0.0:3306 与 [::]:3306，mysqld.exe PID 29096）。
+
+[部分修复]
+  M4   el-card style="padding: '0px'" 无效 CSS
+       HomeView.vue:220 已改成 :body-style="{ padding: '0px' }"；
+       ClassicListView.vue:72、SearchView.vue:121 仍是无效写法。
+  M10  /demo 与 /demo7 没有入口
+       路由已注册（router/index.ts:86-94），导航栏仍无入口。
+  L2   未使用的导入 / 死代码
+       ClassicView.vue 的 formatDate 已补调用（:439）；
+       ClassicsDao.py:12 的 Classicjudges/Discussjudges 导入仍未使用；
+       UserView.vue:14 的 useRoute/RouterLink 与 :25 的 router 仍未使用。
+
+[仍存在] 20 项：S1 S2 S3 H1 H2 H3 H4 H5 H6 H7 M1 M2 M3 M5 M6 M7 M8 M9 M11 L1
+          详见下文各节，每项已标注状态与证据行号。
+
+[本轮新发现]
+  N1. S1 的连带风险：改密接口把哈希密码回写成明文，该账号下次登录会走明文分支。
+      位置：user_blueprint.py:327、UsersDao.py:78
+  N2. 注册与登录已引入 werkzeug 哈希（明文老数据登录时自动升级），
+      唯独改密接口漏改，形成「注册存哈希、改密回明文」的不一致。
+      → 修 S1 时必须一起处理，否则修完 S1 反而让存量账号继续走明文。
+
+
+二、严重（会导致功能不可用或数据错误）
+------------------------------------------------------------------------
+S1. 密码重置对哈希密码无效                                        [仍存在]
+  位置：cls_svr/app/api/user_blueprint.py:327（updatePwd）
+        cls_svr/app/dao/UsersDao.py:78（updateUserByPwd）
+  现状：仍是 if user.upwd == oldpwd 明文比对；新密码以明文写入 new_pwd。
+  原因：教材用明文比对，updateUserByPwd 明文写回。
+  影响：所有已注册用户都无法改密码；改成功后密码降级为明文，
+        且与 register/login 的哈希逻辑冲突（见 N1 / N2）。
+  建议：旧密码 check_password_hash 校验，新密码 generate_password_hash 后再存。
+
+S2. 作品评分单位不一致（数据库 0-100，教材按 1-5）                [仍存在]
+  位置：cls_svr/app/dao/ClassicsDao.py:99（updateClassicRating）
+        cls_clt/src/views/ClassicView.vue:95（initCls）
+  现状：classic.rating = max(judge.rating, classic.rating)；
+        star.value = clsData.value.rating；全仓无 *20 / /20 换算。
+        ClassicView.vue:85 的注释仍写着「比例问题后面再解决」。
+  影响：详情页星级最多只显示 5 星（rating=90 也是 5 星）；
+        打分后 rating 基本不增长；且 max() 是取最大值不是累加，
+        高分作品永远打不动。
+  建议：统一单位。方案 A：后端存 0-100，打分时 star*20，展示 rating/20；
+        方案 B：把数据库 rating 改成 1-5（需同步改打分与展示）。
+
+S3. 中文文件名头像上传 500（IndexError）                          [仍存在]
+  位置：cls_svr/app/api/user_blueprint.py:226（upload）
+  现状：fname = str(uuid.uuid4()) + '.' + upname.rsplit('.', 1)[1]
+        upname 来自 secure_filename，中文名会被滤成 "png"（无点号），
+        第 226 行 rsplit 越界。
+        已在项目 .venv 实测：secure_filename('头像.png') → 'png'，必崩。
+        且第 224 行 allowed_file 用的是原始文件名，中文名能通过校验，
+        正好走到 226 行。
+  影响：中文文件名头像无法上传。
+  建议：加扩展名兜底（无点号时从原始 filename 取），或统一 uuid + 原扩展名。
+        参考 Hi_upload/app.py 里已经做过的兜底写法。
+
+
+三、高（安全、权限、稳定性）
+------------------------------------------------------------------------
+H1. 头像上传接口没有登录校验                                      [仍存在]
+  位置：user_blueprint.py:214-215
+  现状：只有 @user_blueprint.route('/upload', methods=['POST'])，无 @jwt_required()；
+        全仓无 before_request / 蓝图级鉴权兜底。
+  影响：匿名即可往 images/head 写文件（磁盘占用 / 恶意文件）。
+  建议：加 @jwt_required()，并限制文件大小、类型、频率。
+
+H2. v-html 直接渲染作品简介（XSS 风险）                           [仍存在]
+  位置：cls_clt/src/views/ClassicView.vue:394
+  现状：<el-row><div v-html="clsData.describes"></div></el-row>
+        package.json 无 dompurify 等清洗依赖，全仓无 sanitize。
+  影响：describes 含 <script> 或 onerror 时会在浏览器执行，存储型 XSS。
+  建议：改用 {{ clsData.describes }} 文本插值，或后端清洗 HTML。
+
+H3. 书评顶/踩无去重，可无限累加                                   [仍存在]
+  位置：ClassicsDao.py:136-142（updateDiscussTopLow）
+  现状：只查 Discuss.query.get(judge.did)，未按 (did, uid) 查 Discussjudges 去重，
+        每次都 db.session.add(judge) 并 topcount/lowcount +1。
+  影响：顶/踩计数失真。
+  建议：按 (did, uid) 查重，同方向不重复、反方向改判。
+
+H4. 作品评分无去重，评价表无限增长                                [仍存在]
+  位置：ClassicsDao.py:100（updateClassicRating）
+  现状：无条件 db.session.add(judge)，无 (cid, uid) 查重，也无 update 覆盖逻辑。
+  影响：classicjudges 表膨胀；叠加 max() 后重复打分对 rating 无二次影响，
+        但会持续产生垃圾数据。
+  建议：按 (cid, uid) 查重后更新，不重复插入。
+
+H5. 数据库异常被吞，表现为 404 而不是 500                         [仍存在]
+  位置：UsersDao.py:41-43（getUserByUid）
+  现状：except Exception as e: print(e); pass，隐式返回 None；
+        上层 user_blueprint.py:293-298 把 None 映射成 code 404。
+        项目内无 logging，只有 print(e)。
+  影响：MySQL 未启动时 get-user 返回「操作失败！」/404，
+        而不是连接错误，排查困难。
+  建议：DAO 记录日志并向上抛，或返回明确的错误码。
+
+H6. 计数 +1 在 NULL 上会 TypeError                                 [仍存在]
+  位置：ClassicsDao.py:123（commentscount）
+        ClassicsDao.py:139-141（topcount / lowcount）
+  现状：classic.commentscount = classic.commentscount + 1 等，全是裸加。
+  影响：字段为 NULL 时接口 500。
+  建议：(classic.commentscount or 0) + 1。
+
+H7. discuss 为 None 时 for 循环报错                                [仍存在]
+  位置：classics_blueprint.py:291（get_discuss）、:399（get_mydiscuss）
+  现状：for dis in discuss:，无 (discuss or []) 保护。
+  影响：DAO 异常返回 None 时抛 TypeError。
+  建议：for dis in (discuss or [])。
+
+
+四、中（功能、体验、一致性）
+------------------------------------------------------------------------
+M1. 密码重置的错误提示用 success 样式                             [仍存在]
+  位置：cls_clt/src/views/MyPwdView.vue:70
+  现状：失败分支内 type: 'success'。
+  影响：「旧密码不正确」用绿色成功提示弹出。
+  建议：改 type: 'error' 或 'warning'。
+
+M2. 书评 cdate 返回 HTTP 日期串                                   [仍存在]
+  位置：classics_blueprint.py:294（get_discuss）、:404（get_mydiscuss）
+  现状："cdate": dis.cdate，未格式化；全仓无 strftime。
+  影响：前端展示日期会偏移、难读（当前模板未显示日期，暂无视觉影响）。
+  建议：strftime("%Y-%m-%d %H:%M")。
+
+M3. 页面嵌套 <el-footer><el-footer>                                [仍存在]
+  位置：UserView.vue:239-241、MyDiscussView.vue:101-103、MyPwdView.vue:152-154
+  现状：三个页面都还是双层嵌套。
+  影响：底部多一层容器，出现多余高度。
+  建议：改成单层 <el-footer><FooterComp /></el-footer>。
+
+M4. el-card style="padding: '0px'" 是无效 CSS                     [部分修复]
+  位置：ClassicListView.vue:72、SearchView.vue:121（仍是无效写法）
+        HomeView.vue:220（已改成 :body-style="{ padding: '0px' }"）
+  影响：另两处卡片 padding 没被清零。
+  建议：照 HomeView 的写法改。
+
+M5. Tailwind 类名没有效果                                          [仍存在]
+  位置：ClassicListView.vue:64（mr-3）、:69（mt-4 text-sm font-bold）
+        MyDiscussView.vue:93（mx-1）
+  现状：package.json 无 tailwindcss，无 tailwind.config.* / postcss 配置；
+        ClassicListView.vue 全文 90 行且无 <style> 块，这些类名无任何本地定义。
+        已修：HomeView.vue:518 注释「教材用 mt-4 text-sm font-bold，
+        这里换成等价样式」，:521 用 .rec-group-body 替代；
+        DemoView.vue / Demo7View.vue 已无这 6 个类名。
+  建议：改用内联 style 或项目 CSS。
+
+M6. el-image 的 width/height 不生效                                [仍存在]
+  位置：cls_clt/src/components/demo/ImagePreviewDemo.vue:4
+  现状：仍用 width="100px" height="100px" 属性。
+  原因：Element Plus 2.14.7 的 el-image 没有这两个 prop，只是透传属性。
+  建议：改 style="width:100px;height:100px"，或外层容器控制。
+
+M7. 头像上传后需再点「修改」才落库                                 [仍存在]
+  位置：UserView.vue:144-147（handleAvatarSuccess）
+  现状：只做 avatarUrl.value = URL.createObjectURL(...) 与 dataForm.avatar = response.upFile，
+        未调用 editUser()；落库仍靠点「修改」触发 submitForm → editUser。
+        后端 /upload（user_blueprint.py:214-232）也只存文件返回 upFile，不写用户表。
+  影响：选完图页面头像变了，刷新又变回去。
+  建议：上传成功后自动调 editUser()，或明确提示需点「修改」。
+
+M8. 头像为空时 URL 变成 .../head/null                              [仍存在]
+  位置：UserView.vue:124
+  现状：avatarUrl.value = '/svr/api/image/display/head/' + user.value.avatar，无兜底。
+        第 34 行的默认值只在初始化时生效，会被覆盖。
+  影响：无头像用户显示破图。
+  建议：user.value.avatar || 'tx.png'。
+
+M9. 我的书评没有空态                                              [仍存在]
+  位置：MyDiscussView.vue:77-96
+  现状：只有 v-for="item in disDatas" 的列表，无 v-if/v-else、无 el-empty。
+  影响：没有书评时页面只剩标题。
+  建议：加 <el-empty description="还没有发表过书评" />。
+
+M10. /demo 与 /demo7 没有入口                                      [部分修复]
+  位置：router/index.ts:86-94（路由已注册）
+        HeaderComp.vue:139-146（导航只有「首页 + 动态分类」）
+  影响：只能手动输 URL 访问。
+  建议：需要时加入口，不影响主流程。
+
+M11. OutView 模板文案是「退出失败！」                              [仍存在]
+  位置：OutView.vue:21
+  现状：<el-empty description="退出失败！" />
+  影响：退出流程正常，但文案像失败。
+  建议：改「已退出登录」。
+
+M12. 用户中心 el-sub-menu index=""                                 [已修复]
+  位置：HeaderComp.vue
+  现状：已重构为 el-dropdown + handleCommand，模板内无 el-sub-menu。
+  遗留：Logo 的 <el-menu-item index=""> 仍为空（:136），不触发跳转，无实际影响。
+
+
+五、低（代码卫生、文档、环境）
+------------------------------------------------------------------------
+L1. 无人引用的文件                                                 [仍存在]
+  位置：cls_clt/src/views/UserCenterView.vue
+  现状：文件头自述「旧版，未挂路由」；router/index.ts 未导入，
+        全项目引用仅该文件自身。
+  建议：确认不需要后删除，或保留作教学留档。
+
+L2. 未使用的导入 / 死代码                                          [部分修复]
+  - ClassicView.vue 的 formatDate：已补调用（:439）→ 已修复
+  - ClassicsDao.py:12 的 Classicjudges、Discussjudges 导入：本文件 0 处使用
+    （实际使用者在 classics_blueprint.py:257、:369）→ 仍存在
+  - UserView.vue:14 的 useRoute、RouterLink 与 :25 的 router：均未使用 → 仍存在
+
+L3. 教材原样保留的示例问题                                          [未复查]
+  - hi_flash/app.py: if uname != 'admin' and upwd != '123456' 应为 or
+  - hi_flash/templates/login.html: <p><strong>Error:</strong> {{ error }} 的 <p> 未闭合
+  - Hi_upload/README.md 已记录 4 处有意差异
+  说明：这三处属教材示例，本轮未核查也未改动，保持原样。
+
+L4. 没有 git 版本管理                                              [已修复]
+  现状：git log 显示 3 次提交（ae907b6 / c9bb7aa / aa0f3bc）。
+  遗留：git status 显示 146 项未提交/未跟踪，建议分批提交。
+
+L5. MySQL84 未常驻                                                 [已修复]
+  现状：3306 已监听（0.0.0.0:3306 与 [::]:3306，mysqld.exe PID 29096）。
+        另有 3 条 127.0.0.1:3306 ESTABLISHED 连接。
+
+
+========================================================================
+六、测试状态（截至 2026-10-27 10:55）
+========================================================================
+已做并通过：
+  [PASS] 后端全量 py_compile（16 个 .py，注释合并后复验 0 失败）
+  [PASS] 前端 vue-tsc --noEmit（注释合并后复验通过）
+  [PASS] Hi_upload 7 项接口测试（上传、两种下载、异常分支，2026-10-21）
+  [PASS] cls_svr 启动 + GET /api/classics/get-classictypes 返回 200（2026-10-21）
+  [PASS] GET /api/user/get-user 无 Token 返回 401（2026-10-21）
+  [PASS] secure_filename('头像.png') 实测返回 'png'，确认 S3 必崩（2026-10-27）
+
+未做（受环境或依赖限制）：
+  [未测] 登录 -> 用户中心 -> 头像上传 -> 修改资料 -> 我的书评 -> 密码重置 全链路
+  [未测] 作品详情 -> 打分 -> 顶/踩 -> 发表书评
+  [未测] 首页 / 列表页 / 搜索页 -> 作品详情 跳转
+  [未测] hi_flash 消息闪现流程
+  [未测] /demo 与 /demo7 组件示例页面
+  [未测] get-user 带 Token 的 200 分支
+
+
+========================================================================
+七、建议的修复顺序（2026-10-27 修订）
+========================================================================
+第 1 优先（不改就没法用）：
+  1. S1 密码重置哈希兼容，同时处理 N1 / N2 的明文回写与不一致
+  2. S3 中文文件名上传兜底
+  3. H1 上传接口加 @jwt_required()
+
+第 2 优先（数据正确性）：
+  4. S2 评分单位统一（前后端必须一起改，只改一边会更乱）
+  5. H3 / H4 顶踩与评分去重
+  6. H6 NULL 计数保护
+
+第 3 优先（稳定性）：
+  7. H5 异常不再被吞（加 logging，别只用 print）
+  8. H7 discuss 空值保护
+
+第 4 优先（体验与卫生，多数是单行改动）：
+  9. M1 / M3 / M4 / M5 / M6 / M8 / M9 / M11
+  10. M2 日期格式化
+  11. L1 孤儿文件、L2 剩下两处死代码、Logo 的空 index
+
+
+========================================================================
+附：本轮复查方法与限制
+========================================================================
+方法：三组并行只读核查，逐条读源码定位，每条给出文件:行号作为证据。
+      S3 在项目 .venv 内实测 secure_filename('头像.png') 确认必崩。
+未覆盖：L3（hi_flash 教材示例）刻意保留，未复查也未改动。
+行号基准：2026-10-27 10:55 的代码。当日做过一次注释格式统一
+         （单行注释合并到行尾），业务逻辑未变，行号已按调整后的文件重算。
+注意：行号会随后续改动漂移，定位时优先按函数名搜索。
+
+========================================================================
+（完）
+========================================================================
