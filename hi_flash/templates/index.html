@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>用户登录</title>
+</head>
+<body>
+  <!--显示闪现消息-->
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      <ul class=flashes>
+      {% for message in messages %}
+        <li>{{ message }}</li>
+      {% endfor %}
+      </ul>
+    {% endif %}
+  {% endwith %}
+  <h1>首页</h1>
+  <p>
+    您想要<a href="{{ url_for('login') }}"><b>登录？</b></a>
+  </p>
+</body>
+</html>

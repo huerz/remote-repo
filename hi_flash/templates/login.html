@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>用户登录</title>
+</head>
+<body>
+  <h1>登录页</h1>
+  {% if error %}
+  <p><strong>Error:</strong> {{ error }}
+  {% endif %}
+  <form action = "/login" method = "POST">
+    <dl>
+      <dt>用户名:</dt>
+      <dd><input type = text name = "uname"></dd>
+      <dt>密码:</dt>
+      <dd><input type = password name = "upwd"></dd>
+    </dl>
+    <p><input type = "submit" value = "登录"></p>
+  </form>
+</body>
+</html>
