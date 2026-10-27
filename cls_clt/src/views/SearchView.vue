@@ -1,34 +1,27 @@
-<script setup lang="ts">
-import { ref, inject, onMounted, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import type { AxiosInstance } from 'axios'
-import type { ApiResult, Classic } from '@/types'
+<script setup>
+// ============================================================================
+// 搜索结果页（/search/:keyword）
+// ----------------------------------------------------------------------------
+// 作用：按关键字检索作品；keyword 为 all 时返回全部作品。
+// 约定：关键字只从路由参数取，空串统一转 all 由本页解释。
+// ============================================================================
+import { ref, inject, onMounted, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 // 引入顶部导航栏组件
-import HeaderComp from '@/components/HeaderComp.vue'
-// 引入底部导航栏组件
-import FooterComp from '@/components/FooterComp.vue'
-
-const axios = inject('axios') as AxiosInstance // 注入 axios（main.ts 中 provide 的是 AxiosInstance）
-
-// 默认选中“首页”
-const activeIndex = ref<string>('/')
-
-// 创建路由对象，用于获取传递的参数
-const route = useRoute()
-const router = useRouter()
-
+import HeaderComp from '@/components/HeaderComp.vue';
+import FooterComp from '@/components/FooterComp.vue'; // 引入底部导航栏组件
+const axios = inject('axios'); // 注入 axios（main.ts 中 provide 的是 AxiosInstance）
+const activeIndex = ref('/'); // 默认选中“首页”
+const route = useRoute(); // 创建路由对象，用于获取传递的参数
+const router = useRouter();
 // 搜索关键字（route.params 的值类型是 string | string[]，统一转成 string）
-var keyword = ref<string>('')
-// 获取传递过来的关键字
-keyword.value = String(route.params.keyword ?? '')
+var keyword = ref('');
+keyword.value = String(route.params.keyword ?? ''); // 获取传递过来的关键字
 // 如果传递的参数值为 all，则设置关键字为空字符
 if (route.params.keyword == 'all') {
-  keyword.value = ''
+    keyword.value = '';
 }
-
-// 查询的数据列表
-var searchDatas = ref<Classic[]>([])
-
+var searchDatas = ref([]); // 查询的数据列表
 // ============================================================================
 // 【接口 4】文学搜索 API
 // 调用方式：POST 前端 /svr/api/classics/search-classics
@@ -38,50 +31,44 @@ var searchDatas = ref<Classic[]>([])
 // 返回结构：{ code: '200', msg: '操作成功！', data: [ { cid, title, cover, author, ... } ] }
 // 匹配规则（后端）：title 或 author 模糊匹配 %keyword%，rating 倒序
 // ============================================================================
-// 搜索函数
 function searchKeyword() {
-  let data = {
-    keyword: keyword.value
-  }
-  axios<ApiResult<Classic[]>>({
-    method: 'post',
-    url: '/svr/api/classics/search-classics',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    data: data
-  }).then(function (response) {
-    if (response.data.code == '200') {
-      searchDatas.value = response.data.data
-    }
-  }).catch(function (error) {
-    console.log(error)
-  })
+    let data = {
+        keyword: keyword.value
+    };
+    axios({
+        method: 'post',
+        url: '/svr/api/classics/search-classics',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        data: data
+    }).then(function (response) {
+        if (response.data.code == '200') {
+            searchDatas.value = response.data.data;
+        }
+    }).catch(function (error) {
+        console.log(error);
+    });
 }
-
-// 完成初始渲染并创建 DOM 节点后，进行页面加载
 onMounted(() => {
-  searchKeyword() // 查询操作
-})
-
-// 结果页内再次搜索：刷新路由参数
+    searchKeyword(); // 查询操作
+});
 function submitSearch() {
-  var mykeyword = keyword.value
-  if (keyword.value == '') {
-    mykeyword = 'all'
-  }
-  if (route.params.keyword == mykeyword) {
-    searchKeyword() // 关键字未变，直接重新查询
-  } else {
-    router.push({ name: 'search', params: { keyword: mykeyword } })
-  }
+    var mykeyword = keyword.value;
+    if (keyword.value == '') {
+        mykeyword = 'all';
+    }
+    if (route.params.keyword == mykeyword) {
+        searchKeyword(); // 关键字未变，直接重新查询
+    }
+    else {
+        router.push({ name: 'search', params: { keyword: mykeyword } });
+    }
 }
-
-// 同一组件复用（仅路由参数变化）时重新查询
 watch(() => route.params.keyword, (val) => {
-  keyword.value = (val == 'all' || val == null) ? '' : String(val)
-  searchKeyword()
-})
+    keyword.value = (val == 'all' || val == null) ? '' : String(val);
+    searchKeyword();
+});
 </script>
 
 <template>
@@ -121,25 +108,14 @@ watch(() => route.params.keyword, (val) => {
           v-for="item in searchDatas"
           :key="item.cid"
           :xs="12" :sm="8" :md="6" :lg="4">
-          <RouterLink class="cls-link" :to="'/cls/' + item.cid + '/' + item.tid">
-            <el-card class="cls-card" shadow="hover" :body-style="{ padding: '10px' }">
-              <!--有封面图用图片，无封面时用 CSS 排版一张宣纸感封面-->
-              <el-image
-                v-if="item.cover"
-                class="cls-cover"
+          <el-card style="padding: '0px'">
+            <template #header>{{ item.title }}</template>
+            <RouterLink :to="String('/cls/' + item.cid) + String('/') + item.tid">
+              <img
                 :src="String('/svr/api/image/display/cls/') + item.cover"
-                fit="contain" />
-              <div v-else class="cls-cover cls-cover-text">
-                <span class="cover-title">{{ item.title }}</span>
-                <span class="cover-author">{{ item.author }}</span>
-              </div>
-              <div class="cls-title" :title="item.title">{{ item.title }}</div>
-              <div class="cls-meta">{{ item.year }} · {{ item.author }}</div>
-              <div class="cls-rating">
-                <el-rate :model-value="(item.rating ?? 0) / 20" disabled allow-half size="small" />
-              </div>
-            </el-card>
-          </RouterLink>
+                style="width: 100%; display: block" />
+            </RouterLink>
+          </el-card>
         </el-col>
       </el-row>
       <el-empty v-else description="没有找到相关作品" />

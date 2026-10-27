@@ -1,10 +1,15 @@
-<script setup lang="ts">
-import { ref } from 'vue'
-import HeaderComp from '@/components/HeaderComp.vue'
-import FooterComp from '@/components/FooterComp.vue'
-
+<script setup>
+// ============================================================================
+// 404 兜底页
+// ----------------------------------------------------------------------------
+// 作用：路由未匹配时展示，提供返回首页入口。
+// 约定：不要在这里发请求，避免 404 页面本身再报错。
+// ============================================================================
+import { ref } from 'vue';
+import HeaderComp from '@/components/HeaderComp.vue';
+import FooterComp from '@/components/FooterComp.vue';
 // 顶部导航栏菜单选中项索引（404 页不属于任何分类，保持空值）
-const activeIndex = ref<string>('')
+const activeIndex = ref('');
 </script>
 
 <template>

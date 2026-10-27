@@ -1,36 +1,28 @@
-<script setup lang="ts">
-import { ref, inject, onMounted, computed } from 'vue'
-import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import type { AxiosInstance } from 'axios'
-import type { ApiResult, DiscussUser } from '@/types'
-// 引入 Token 状态管理
-import { useTokenStore } from '@/stores/token'
-// 顶部 / 底部导航
-import HeaderComp from '@/components/HeaderComp.vue'
-import FooterComp from '@/components/FooterComp.vue'
-
-const axios = inject('axios') as AxiosInstance // 注入 axios
-const router = useRouter()
-const userStore = useTokenStore()
-
-// 登录态直接跟随 Store，别处清 token 时这里同步
-const token = computed(() => userStore.token)
-
-// 顶部导航选中项（个人中心不在分类菜单里，保持空）
-const activeIndex = ref<string>('')
-// 用户信息
-const user = ref<DiscussUser | null>(null)
-// 头像地址
-const userUrl = ref<string>('/svr/api/image/display/head/tx.png')
-// 官方 Avatar 回退：图片 404 时返回 true，改渲染插槽（昵称首字）
-const onAvatarError = () => true
-// 头像兜底文字
+<script setup>
+// ============================================================================
+// 个人中心（旧版，未挂路由）
+// ----------------------------------------------------------------------------
+// 作用：早期版本的个人中心页面，当前路由指向 UserView.vue；保留仅供对照。
+// 约定：示例页只组合演示组件，不写业务逻辑、不发接口请求。
+// ============================================================================
+import { ref, inject, onMounted, computed } from 'vue';
+import { useRouter } from 'vue-router';
+import { ElMessage } from 'element-plus';
+import { useTokenStore } from '@/stores/token'; // 引入 Token 状态管理
+import HeaderComp from '@/components/HeaderComp.vue'; // 顶部 / 底部导航
+import FooterComp from '@/components/FooterComp.vue';
+const axios = inject('axios'); // 注入 axios
+const router = useRouter();
+const userStore = useTokenStore();
+const token = computed(() => userStore.token); // 登录态直接跟随 Store，别处清 token 时这里同步
+const activeIndex = ref(''); // 顶部导航选中项（个人中心不在分类菜单里，保持空）
+const user = ref(null); // 用户信息
+const userUrl = ref('/svr/api/image/display/head/tx.png'); // 头像地址
+const onAvatarError = () => true; // 官方 Avatar 回退：图片 404 时返回 true，改渲染插槽（昵称首字）
 const nickFirst = computed(() => {
-  const n = user.value?.nickname || user.value?.uname || '我'
-  return n.slice(0, 1)
-})
-
+    const n = user.value?.nickname || user.value?.uname || '我';
+    return n.slice(0, 1);
+});
 // ============================================================================
 // 【接口】查询登录用户信息 API
 // 调用方式：GET 前端 /svr/api/user/get-user
@@ -40,37 +32,34 @@ const nickFirst = computed(() => {
 // 说明：未登录直接回登录页；Token 失效（401/422）清登录态并跳登录
 // ============================================================================
 function initUser() {
-  if (!token.value) {
-    router.replace('/login')
-    return
-  }
-  axios<ApiResult<DiscussUser>>({
-    method: 'get',
-    url: '/svr/api/user/get-user',
-    headers: { Authorization: 'Bearer ' + token.value }
-  }).then(function (response) {
-    if (response.data.code === '200') {
-      user.value = response.data.data
-      userUrl.value = '/svr/api/image/display/head/' + (response.data.data.avatar || 'tx.png')
+    if (!token.value) {
+        router.replace('/login');
+        return;
     }
-  }).catch(function (error) {
-    console.log(error)
-    if (error.response && (error.response.status === 401 || error.response.status === 422)) {
-      userStore.setToken('')
-      ElMessage.warning('登录已过期，请重新登录')
-      router.replace('/login')
-    }
-  })
+    axios({
+        method: 'get',
+        url: '/svr/api/user/get-user',
+        headers: { Authorization: 'Bearer ' + token.value }
+    }).then(function (response) {
+        if (response.data.code === '200') {
+            user.value = response.data.data;
+            userUrl.value = '/svr/api/image/display/head/' + (response.data.data.avatar || 'tx.png');
+        }
+    }).catch(function (error) {
+        console.log(error);
+        if (error.response && (error.response.status === 401 || error.response.status === 422)) {
+            userStore.setToken('');
+            ElMessage.warning('登录已过期，请重新登录');
+            router.replace('/login');
+        }
+    });
 }
-
-// 退出登录：清 Token → 提示 → 回首页
 function logout() {
-  userStore.setToken('')
-  ElMessage.success('已退出登录')
-  router.push('/')
+    userStore.setToken('');
+    ElMessage.success('已退出登录');
+    router.push('/');
 }
-
-onMounted(initUser)
+onMounted(initUser);
 </script>
 
 <template>

@@ -6,8 +6,11 @@
     "moduleResolution": "bundler",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
 
-    /* 类型检查：严格模式，和教材的 TS 写法保持一致 */
+    /* 类型检查：严格模式，和教材的 TS 写法保持一致
+       allowJs：src/router/index.js 等纯 JS 文件允许被 TS 引用，不参与严格检查 */
     "strict": true,
+    "allowJs": true,
+    "checkJs": false,
     "noEmit": true,
     "skipLibCheck": true,
     "isolatedModules": true,
@@ -29,8 +32,7 @@
   },
   "include": [
     "env.d.ts",
-    "vite.config.ts",
-    "src/**/*.ts",
+    "src/**/*.js",
     "src/**/*.d.ts",
     "src/**/*.vue"
   ],

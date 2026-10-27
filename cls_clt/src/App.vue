@@ -1,7 +1,16 @@
-<script setup lang="ts">
-import { RouterView } from 'vue-router'
+<script setup>
+// ============================================================================
+// 根组件
+// ----------------------------------------------------------------------------
+// 作用：只负责挂载 <RouterView> 与全局布局，业务都在 views 里。
+// 约定：不写业务逻辑，避免根组件变成状态中转站。
+// ============================================================================
+import { RouterView } from 'vue-router';
+// 右下角浮动的「回到顶部 / 滚到底部」按钮（全局一份，所有页面都有）
+import ScrollNav from '@/components/ScrollNav.vue';
 </script>
 
 <template>
   <RouterView />
+  <ScrollNav />
 </template>

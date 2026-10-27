@@ -6,6 +6,15 @@ html:root {
      避免组件默认蓝色与宣纸+朱红的整体风格冲突 */
   --el-color-primary: #a8352c;
   --el-menu-active-color: #a8352c;
+
+  /* ================= 图标色板（全站统一） =================
+     Element Plus 图标默认灰（#a8abb2），在宣纸底上偏冷、偏硬，
+     这里统一成褐色系；需要强调时用 --app-icon-brand（朱红）。 */
+  --app-icon: #8c7a63;          /* 常规图标 */
+  --app-icon-strong: #5a3a22;   /* 深色图标（标题旁） */
+  --app-icon-muted: #b3a48d;    /* 弱化图标（空态、占位） */
+  --app-icon-brand: #a8352c;    /* 强调图标（朱红） */
+  --app-icon-base: #f3ead9;     /* 图标底色 */
 }
 
 html, body {
@@ -19,4 +28,121 @@ html, body {
   margin: 0;
   padding: 0;
   text-align: center;
+}
+
+/* ============================================================================
+   图标规范
+   ----------------------------------------------------------------------------
+   1. 统一尺寸与基线：Element Plus 的图标默认 14px 且基线 -0.125em，
+      与本站 14~15px 的正文并排时高低不一，这里统一成 16px / -0.15em。
+      只改尺寸和基线，**不改颜色**——颜色交给各组件自己定，
+      否则会把朱红按钮里的白色图标也染成褐色。
+   2. 尺寸档：需要更小/更大时用 .icon-sm / .icon-lg / .icon-xl。
+   3. 输入框前缀图标：默认淡褐，聚焦时变朱红，和输入框文字同步「亮起来」。
+   4. 页面头（el-page-header）图标：Element Plus 默认是灰色方块，
+      改成站内的圆形米色底 + 褐色图标，与头像占位、空态图标同一套语言。
+   ============================================================================ */
+.el-icon {
+  font-size: 16px;
+  vertical-align: -0.15em;
+}
+
+.icon-sm {
+  font-size: 14px;
+}
+
+.icon-lg {
+  font-size: 18px;
+}
+
+.icon-xl {
+  font-size: 22px;
+}
+
+/* 输入框前缀图标：两种写法都覆盖——
+   1) Element Plus 的 #prefix/#suffix 插槽（.el-input__prefix / .el-input__suffix）
+   2) 本项目常用的写法：直接给图标加 .el-input__icon 类（登录、搜索框都是这种） */
+.el-input__prefix .el-icon,
+.el-input__suffix .el-icon,
+.el-input .el-input__icon {
+  font-size: 16px;
+  color: var(--app-icon-muted);
+  transition: color 0.2s ease;
+}
+
+.el-input:focus-within .el-input__prefix .el-icon,
+.el-input:focus-within .el-input__suffix .el-icon,
+.el-input:focus-within .el-input__icon {
+  color: var(--app-icon-brand);
+}
+
+/* 页面头图标：圆形米色底 */
+.el-page-header__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background-color: var(--app-icon-base);
+}
+
+.el-page-header__icon .el-icon {
+  font-size: 18px;
+  color: var(--app-icon);
+}
+
+/* 空态图标容器：40px 圆形浅底，与书评区空态同一套 */
+.empty-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background-color: var(--app-icon-base);
+  color: var(--app-icon-muted);
+  font-size: 22px;
+}
+
+/* ============================================================
+ * 全站消息提示（ElMessage）观感调整
+ * ------------------------------------------------------------
+ * 原先的问题：EP 默认把它贴在 top 16px，正好压在 60px 高的导航栏里，
+ *             入场只是「从上滑落 + 淡入」，在宣纸底色上几乎没有存在感。
+ * 改动：下移到导航栏下方（72px）、入场改成缩放回弹、阴影加浓。
+ * 注意：本文件在 element-plus/dist/index.css 之前引入，同权重会被 EP 覆盖，
+ *       所以选择器前缀加 html 提权；top 由组件内联 style 写入，只能 !important。
+ *       多条提示同时出现时会被压在同一个 top 上（本项目提示均为单发场景）。
+ * ============================================================ */
+html .el-message {
+  top: 84px !important;
+  min-width: 180px;
+  padding: 14px 26px;
+  gap: 10px;
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(90, 58, 34, 0.2);
+  transition:
+    opacity var(--el-transition-duration),
+    transform 0.42s cubic-bezier(0.34, 1.56, 0.64, 1),
+    top 0.4s,
+    bottom 0.4s;
+}
+
+/* 图标与文字同步放大，否则只加大 padding 会显得空 */
+html .el-message .el-message__icon {
+  font-size: 20px;
+}
+
+html .el-message .el-message__content {
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+/* 入场起点：缩小 + 透明。EP 原版是 translate(-50%,-100%) 从上滑落 */
+html .el-message-fade-enter-from.is-center,
+html .el-message-fade-leave-to.is-center {
+  opacity: 0;
+  transform: translate(-50%) scale(0.75);
 }

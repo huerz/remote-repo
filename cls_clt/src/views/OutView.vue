@@ -1,28 +1,20 @@
-<script setup lang="ts">
-import { onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+<script setup>
+// ============================================================================
+// 退出登录（/out）
+// ----------------------------------------------------------------------------
+// 教材：第六章 §6.3.1 用户退出
+// 作用：清空 Token 与本地用户信息后跳回首页。
+// 约定：退出只清本地状态，不调用后端注销接口（JWT 无状态）。
+// ============================================================================
+import { useRouter } from 'vue-router';
 // 引入状态管理文件
-import { useTokenStore } from '@/stores/token'
-import { ElMessage } from 'element-plus'
-
-// 创建 Token 状态管理 Store
-const userStore = useTokenStore()
-// 创建路由对象
-const router = useRouter()
-
-// 放在 onMounted 里执行：setup 阶段直接 router.push 是在组件挂载前触发导航，
-// 容易与当前渲染流程打架（会报「Redirected when going from ...」之类的警告）
-onMounted(() => {
-  // 设置当前登录用户的 Token 为空（清除登录态，同时清掉 localStorage）
-  userStore.setToken('')
-  // 官方 Message 组件：给用户一个明确的「已退出」反馈
-  ElMessage.success('已退出登录')
-  // 退出后，跳转至首页
-  router.push('/')
-})
+import { useTokenStore } from '@/stores/token';
+const userStore = useTokenStore(); // 创建 Token 状态管理 Store
+userStore.setToken(''); // 设置当前登录用户的 Token 为空
+const router = useRouter(); // 创建路由对象
+router.push('/'); // 退出后，跳转至首页
 </script>
 
 <template>
-  <!-- 跳转过程中短暂显示，正常情况用户几乎看不到 -->
-  <el-empty description="已退出登录，正在返回首页…" />
+  <el-empty description="退出失败！" />
 </template>

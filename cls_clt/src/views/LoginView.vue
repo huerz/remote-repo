@@ -1,73 +1,51 @@
-<script setup lang="ts">
-import { ref, inject, reactive } from 'vue'
-import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import type { FormInstance, FormRules } from 'element-plus'
-import type { AxiosInstance } from 'axios'
-// 引入 Token 状态管理
-import { useTokenStore } from '@/stores/token'
-// 引入顶部导航栏组件
-import HeaderComp from '@/components/HeaderComp.vue'
-// 引入底部导航栏组件
-import FooterComp from '@/components/FooterComp.vue'
-
-const axios = inject('axios') as AxiosInstance // 注入 axios（main.js 中 provide 的是 AxiosInstance）
-
-// 顶部导航栏菜单选中项索引（当前在“登录”）
-const activeIndex = ref<string>('/login')
-// 创建 Token 状态管理 Store
-const userStore = useTokenStore()
-// 创建路由对象，用于编程式导航
-const router = useRouter()
-
-// 以下为表单数据校验代码
-interface DataForm {
-  uname: string
-  upwd: string
-}
-
-// 登录接口返回结构（成功时带 token）
-interface LoginResult {
-  code: string
-  msg: string
-  token?: string
-}
-
-// 表单实例：调用 validate() 做校验、resetFields() 做重置
-const ruleFormRef = ref<FormInstance>()
-
+<script setup>
+// ============================================================================
+// 登录页（/login）
+// ----------------------------------------------------------------------------
+// 作用：账号密码登录，成功后写入 Token 并回到来源页或首页。
+// 教材：第六章 §6.3.1 用户登录与退出（退出实现见 OutView）
+// 约定：密码不在前端做任何持久化，Token 统一走 stores/token。
+// ============================================================================
+import { ref, inject, reactive } from 'vue';
+import { useRouter } from 'vue-router';
+import { ElMessage } from 'element-plus';
+import { useTokenStore } from '@/stores/token'; // 引入 Token 状态管理
+import HeaderComp from '@/components/HeaderComp.vue'; // 引入顶部导航栏组件
+import FooterComp from '@/components/FooterComp.vue'; // 引入底部导航栏组件
+const axios = inject('axios'); // 注入 axios（main.js 中 provide 的是 AxiosInstance）
+const activeIndex = ref('/login'); // 顶部导航栏菜单选中项索引（当前在“登录”）
+const userStore = useTokenStore(); // 创建 Token 状态管理 Store
+const router = useRouter(); // 创建路由对象，用于编程式导航
+const ruleFormRef = ref(); // 表单实例：调用 validate() 做校验、resetFields() 做重置
 // 表单数据（登录数据）
-const dataForm = reactive<DataForm>({
-  uname: '',
-  upwd: ''
-})
-
+const dataForm = reactive({
+    uname: '',
+    upwd: ''
+});
 // 表单校验规则
-const rules = reactive<FormRules<DataForm>>({
-  uname: [{ required: true, message: '请输入账号...', trigger: 'blur' }],
-  upwd: [{ required: true, message: '请输入密码...', trigger: 'blur' }]
-})
-
-// “登录”按钮事件
-const submitForm = (formEl: FormInstance | undefined) => {
-  if (!formEl) return
-  // 注意：validate(callback) 同时返回 Promise，校验不通过时这个 Promise 会 reject；
-  // 这里不加 await，避免冒出一个没人处理的 Promise 错误（控制台会飘红）
-  formEl.validate((valid: boolean, fields) => {
-    if (valid) {
-      login() // 用户登录操作
-    } else {
-      console.log('error submit!', fields)
-    }
-  })
-}
-
-// “重置”按钮事件
-const resetForm = (formEl: FormInstance | undefined) => {
-  if (!formEl) return
-  formEl.resetFields()
-}
-
+const rules = reactive({
+    uname: [{ required: true, message: '请输入账号...', trigger: 'blur' }],
+    upwd: [{ required: true, message: '请输入密码...', trigger: 'blur' }]
+});
+const submitForm = (formEl) => {
+    if (!formEl)
+        return;
+    // 注意：validate(callback) 同时返回 Promise，校验不通过时这个 Promise 会 reject；
+    // 这里不加 await，避免冒出一个没人处理的 Promise 错误（控制台会飘红）
+    formEl.validate((valid, fields) => {
+        if (valid) {
+            login(); // 用户登录操作
+        }
+        else {
+            console.log('error submit!', fields);
+        }
+    });
+};
+const resetForm = (formEl) => {
+    if (!formEl)
+        return;
+    formEl.resetFields();
+};
 // ============================================================================
 // 【接口 6】用户登录 API
 // 调用方式：POST 前端 /svr/api/user/login
@@ -79,33 +57,29 @@ const resetForm = (formEl: FormInstance | undefined) => {
 //           { code: '404', msg: '参数错误' }                       请求体为空
 // 说明：登录成功后把 token 存入 Pinia（同时写入 localStorage），供后续接口鉴权使用
 // ============================================================================
-// 用户登录函数
 function login() {
-  axios<LoginResult>({
-    method: 'post',
-    url: '/svr/api/user/login',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    data: dataForm
-  }).then(function (response) {
-    console.log(response.data)
-    if (response.data.code == '200') {
-      // 提示信息
-      ElMessage.success('登录成功！')
-      // 获取登录用户的 Token
-      const token = response.data.token ?? ''
-      userStore.setToken(token)
-      // 登录成功，跳转至首页
-      router.push('/')
-    } else {
-      // 后端返回 400/404 时，直接提示后端给的 msg
-      ElMessage.error(response.data.msg || '登录失败！')
-    }
-  }).catch(function (error) {
-    console.log(error)
-    ElMessage.error('登录失败！')
-  })
+    axios({
+        method: 'post',
+        url: '/svr/api/user/login',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        data: dataForm
+    }).then(function (response) {
+        console.log(response.data);
+        if (response.data.code == '200') {
+            ElMessage.success('登录成功！'); // 提示信息
+            const token = response.data.token ?? ''; // 获取登录用户的 Token
+            userStore.setToken(token);
+            router.push('/'); // 登录成功，跳转至首页
+        }
+        else {
+            ElMessage.error(response.data.msg || '登录失败！'); // 后端返回 400/404 时，直接提示后端给的 msg
+        }
+    }).catch(function (error) {
+        console.log(error);
+        ElMessage.error('登录失败！');
+    });
 }
 </script>
 
@@ -174,6 +148,13 @@ function login() {
 
 .login-form {
   font-family: 'Songti SC', 'STSong', 'SimSun', serif;
+}
+
+/* 输入框里的账号图标：与搜索框同色同尺寸，默认灰在这套浅色背景里发冷 */
+.login-form :deep(.el-input__suffix .el-icon),
+.login-form :deep(.el-input__prefix .el-icon) {
+  font-size: 16px;
+  color: #8c7a63;
 }
 
 /* 按钮行居中（el-form-item 的内容区是 flex，居中要作用在 __content 上） */

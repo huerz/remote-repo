@@ -11,7 +11,7 @@ export default defineConfig({
         // changeOrigin 用于指定是否需要将原始主机头更改为目标 URL，默认为 false
         changeOrigin: true,
         // 重写请求。实际接口中并没有 /svr，所以需要替换为空（''）
-        rewrite: (path: string) => path.replace(/^\/svr/, '')
+        rewrite: (path) => path.replace(/^\/svr/, '')
       }
     }
   },

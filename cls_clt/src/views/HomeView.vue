@@ -1,136 +1,94 @@
-<script setup lang="ts">
-import { ref, inject, onMounted, computed } from 'vue'
-import { useRouter } from 'vue-router'
-import type { AxiosInstance } from 'axios'
-import type { ApiResult, Classic, Classictype, RecommendGroup } from '@/types'
-// 引入顶部导航栏组件
-import HeaderComp from '@/components/HeaderComp.vue'
-// 引入底部导航栏组件
-import FooterComp from '@/components/FooterComp.vue'
-
-
-// 顶部导航栏菜单选中项索引，默认选中“首页”
-const activeIndex = ref<string>('/')
-
-const axios = inject('axios') as AxiosInstance // 注入 axios（main.ts 中 provide 的是 AxiosInstance）
-
-// 创建路由对象，用于编程式导航
-const router = useRouter()
-
-// 搜索框中的关键字
-const keyword = ref<string>('')
-
-// 说明：此处不调用后端接口，只做纯前端路由跳转
-// 跳转目标路由：name = 'search'，path = '/search/:keyword'
-// 空关键字统一传 'all'，由 SearchView 解释为「查询全部」
-// 搜索跳转方法，用于跳转至搜索结果页
-function searchKeyword() {
-  // 获取输入的搜索关键字
-  var mykeyword = keyword.value
-  // 当搜索关键字为空时，设置值为 all（表示搜索所有内容）
-  if (keyword.value == '') {
-    mykeyword = 'all'
-  }
-  // 跳转至搜索结果页，并传递关键字
-  router.push({ name: 'search', params: { keyword: mykeyword } })
-}
-
-// 轮播图数据列表
-var carouselDatas = ref<Classic[]>([])
-
+<script setup>
 // ============================================================================
-// 【接口 3】首页轮播图 API
+// 首页（教材项目 5「古典文学网」首页模块，教材 140–150 页）
+// ----------------------------------------------------------------------------
+// 结构严格按教材 5.3 各小节：
+//   5.3.1 开发首页导航栏功能   → el-container + HeaderComp + FooterComp
+//   5.3.2 开发首页轮播图功能   → search-carousels/6 + el-carousel
+//   5.3.3 开发文学搜索功能     → 纯前端路由跳转 SearchView
+//   5.3.4 开发文学推荐功能     → recommend-classics/6 + el-page-header + el-card
+// 卡片结构按教材图 5.12：书名放 el-card 的 #header，封面放 body
+// 额外：欢迎横幅与两侧诗人形象（本需求新增，教材无此模块，放在 el-main 最前）
+// ============================================================================
+import { ref, inject, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
+import HeaderComp from '@/components/HeaderComp.vue'; // 引入顶部导航栏组件
+import FooterComp from '@/components/FooterComp.vue'; // 引入底部导航栏组件
+import PoetIntro from '@/components/PoetIntro.vue'; // 首页「诗人小传」板块：讲诗人 + 作品直达书评区
+import PoetFigures from '@/components/PoetFigures.vue'; // 引入欢迎横幅两侧的诗人形象（纯内联 SVG + CSS 动画，不依赖图库文件）
+const activeIndex = ref('/'); // 顶部导航栏菜单选中项索引，默认选中“首页”
+// 注入 axios（main.ts 中 provide 的是 AxiosInstance 实例）
+const axios = inject('axios');
+const router = useRouter(); // 创建路由对象，用于编程式导航
+const keyword = ref(''); // 搜索框中的关键字
+// 说明：此处不调用后端接口，只做纯前端路由跳转（教材 5.3.3）
+// 跳转目标路由：name = 'search'，path = '/search/:keyword'（教材 146 页）
+// 空关键字统一传 'all'，由 SearchView 解释为「查询全部」
+function searchKeyword() {
+    var mykeyword = keyword.value; // 获取输入的搜索关键字
+    // 当搜索关键字为空时，设置值为 all（表示搜索所有内容）
+    if (keyword.value == '') {
+        mykeyword = 'all';
+    }
+    router.push({ name: 'search', params: { keyword: mykeyword } }); // 跳转至搜索结果页，并传递关键字
+}
+var carouselDatas = ref([]); // 轮播图数据列表
+const carouselRef = ref(); // 轮播组件实例：自定义左右箭头通过它调用 prev() / next()
+// 上一张 / 下一张：按钮放在卡片外侧，所以不再用组件自带的箭头（arrow="never"）
+function prevSlide() {
+    carouselRef.value?.prev();
+}
+function nextSlide() {
+    carouselRef.value?.next();
+}
+// ============================================================================
+// 【接口】首页轮播图 API（教材 5.3.2 / 3.3.7）
 // 调用方式：GET  前端 /svr/api/classics/search-carousels/6
 //                 后端 http://127.0.0.1:5382/api/classics/search-carousels/6
 // 路径参数：6 = 需要返回的轮播图条数
-// 返回结构：{ code: '200', msg: '操作成功！', data: [ { cid, title, cover, author, rating, ... } ] }
+// 返回结构：{ code:'200', msg:'操作成功！', data:[{ cid, title, cover, author, rating, ... }] }
 // 排序规则（后端）：rating 倒序 → cid 升序
 // ============================================================================
-// 调用 API，获取轮播图数据列表，用于初始化首页轮播图
 function initCarousel() {
-  axios<ApiResult<Classic[]>>({
-    method: 'get',
-    url: '/svr/api/classics/search-carousels/6'
-  }).then(function (response) {
-    if (response.data.code == '200') {
-      carouselDatas.value = response.data.data
-    }
-  }).catch(function (error) {
-    console.log(error)
-  })
+    axios({
+        method: 'get',
+        url: '/svr/api/classics/search-carousels/6'
+    }).then(function (response) {
+        if (response.data.code == '200') {
+            carouselDatas.value = response.data.data;
+        }
+    }).catch(function (error) {
+        console.log(error);
+    });
 }
-
-// 完成初始渲染并创建 DOM 节点后，进行页面加载
-onMounted(() => {
-  // 初始化轮播图
-  initCarousel()
-  // 初始化文学推荐
-  initRecommend()
-})
-
-// ============================ 5.3.4 文学推荐 ============================
-// 类型列表（提供给推荐区做分组标题）
-var typeDatas = ref<Classictype[]>([])
-// 全部作品（用于按 tid 分组渲染）
-var classicDatas = ref<Classic[]>([])
-
+var recommendDatas = ref([]); // 推荐的文学列表数据（按作品类型分组）
 // ============================================================================
-// 【接口 2】文学导航 API（复用导航栏接口，取类型名做分组标题）
-// 调用方式：GET /svr/api/classics/get-classictypes
-// 参数：无
-// 返回：{ code:'200', data:[{tid, name, cover, remark}] }
-// ============================================================================
-function initClassictypes() {
-  axios<ApiResult<Classictype[]>>({
-    method: 'get',
-    url: '/svr/api/classics/get-classictypes'
-  }).then(function (response) {
-    if (response.data.code == '200') {
-      typeDatas.value = response.data.data
-    }
-  }).catch(function (error) {
-    console.log(error)
-  })
-}
-
-// ============================================================================
-// 【接口 4】文学搜索 API（keyword 传空串 = 取全部作品，供本地分组）
-// 调用方式：POST /svr/api/classics/search-classics
-// 请求体：{ "keyword": "" }
-// 返回：{ code:'200', data:[{cid, title, cover, author, tid, ...}] }
+// 【接口】文学推荐 API（教材 5.3.4 / 3.3.5）
+// 调用方式：GET  前端 /svr/api/classics/recommend-classics/12
+//                 后端 http://127.0.0.1:5382/api/classics/recommend-classics/12
+// 路径参数：12 = 每个文学类型下返回的作品条数（首页一行 6 本，共两行）
+// 返回结构：{ code:'200', msg:'操作成功！',
+//            data:[{ tid, name, cover, remark,
+//                    classics:[{ cid, title, cover, author, rating, ... }] }] }
+// 排序规则（后端）：类型按 tid 升序；同一类型内 rating 倒序 → cid 升序
+// 说明：库里共 108 部作品，每类取 12 部即可铺满两行（不足 12 部的类型返回全部）
 // ============================================================================
 function initRecommend() {
-  initClassictypes()
-  axios<ApiResult<Classic[]>>({
-    method: 'post',
-    url: '/svr/api/classics/search-classics',
-    headers: { 'Content-Type': 'application/json' },
-    data: { keyword: '' }
-  }).then(function (response) {
-    if (response.data.code == '200') {
-      classicDatas.value = response.data.data
-    }
-  }).catch(function (error) {
-    console.log(error)
-  })
+    axios({
+        method: 'get',
+        url: '/svr/api/classics/recommend-classics/12'
+    }).then(function (response) {
+        if (response.data.code == '200') {
+            recommendDatas.value = response.data.data;
+        }
+    }).catch(function (error) {
+        console.log(error);
+    });
 }
-
-// 按文学作品类型分组（无作品的类型不展示）
-const recommendGroups = computed<RecommendGroup[]>(() => {
-  return typeDatas.value
-    .map(function (t: Classictype): RecommendGroup {
-      return {
-        tid: t.tid,
-        name: t.name,
-        list: classicDatas.value.filter(function (c: Classic) {
-          return c.tid === t.tid
-        })
-      }
-    })
-    .filter(function (g: RecommendGroup) {
-      return g.list.length > 0
-    })
-})
+onMounted(() => {
+    initCarousel(); // 初始化首页轮播图
+    initRecommend(); // 初始化文学推荐栏目
+});
 </script>
 
 <template>
@@ -139,22 +97,24 @@ const recommendGroups = computed<RecommendGroup[]>(() => {
     <el-header height="60px">
       <HeaderComp :active-index="activeIndex" />
     </el-header>
+
     <!--主要区域容器-->
     <el-main>
-      <!--欢迎横幅开始-->
+      <!--==================== 欢迎横幅（本需求新增，教材无此模块） ====================-->
       <div class="welcome-banner">
+        <!-- 两侧著名诗人形象：李白 / 杜甫 / 苏轼 / 李清照 -->
+        <PoetFigures />
         <div class="banner-text">
           <h1 class="banner-title">欢迎访问古典文学网</h1>
           <p class="banner-sub">品读千年文脉 · 传承中华经典</p>
         </div>
       </div>
-      <!--欢迎横幅结束-->
-      <!--搜索框开始（紧跟横幅，作为首页主入口）-->
+
+      <!--搜索框开始（与轮播同宽 760px，位于轮播上方）-->
       <div class="search-box">
         <el-input
           v-model="keyword"
-          size="large"
-          placeholder="书名 / 作者，如：静夜思"
+          placeholder="请输入搜索关键字"
           clearable
           @keyup.enter="searchKeyword">
           <template #prefix>
@@ -166,65 +126,96 @@ const recommendGroups = computed<RecommendGroup[]>(() => {
         </el-input>
       </div>
       <!--搜索框结束-->
+
       <!--轮播图开始-->
-      <!--封面图走【接口 1】图片显示 API：/svr/api/image/display/cls/<该项的 cover 文件名>-->
+      <!--封面图走图片显示接口：/svr/api/image/display/cls/<该项的 cover 文件名>-->
       <div class="carousel-wrap">
-        <el-carousel :interval="4000" type="card" height="340px">
+        <!-- 封面统一是 600×870 竖版（宽高比 0.69）。卡片位宽度由组件固定为容器的一半
+             （760 / 2 = 380px），比封面宽很多，若让封面铺满卡片宽度就会被裁掉上下、
+             看起来像被压扁；所以封面只取中间 380px 高（约 262 宽），卡片高 440px，
+             上下各留 30px，四周都有留白。
+             底部切换按钮用 indicator-position="outside" 放到卡片外面；
+             左右箭头也改成外侧自绘按钮（arrow="never" 关掉组件自带的） -->
+        <el-carousel
+          ref="carouselRef"
+          :interval="4000"
+          type="card"
+          height="440px"
+          arrow="never"
+          indicator-position="outside">
           <el-carousel-item v-for="item in carouselDatas" :key="item.cid">
-            <!-- 点击轮播图进入作品展示页：/cls/<作品编号>/<类型编号> -->
-            <RouterLink :to="'/cls/' + item.cid + '/' + item.tid">
-              <el-image
-                class="carousel-img"
-                :src="String('/svr/api/image/display/cls/') + item.cover"
-                fit="contain"/>
+            <!-- 教材此处写作 to=""（当时详情页尚未开发）；
+                 本项目详情页已实现，填真实路由，避免空 to 渲染成带下划线的裸链接 -->
+            <RouterLink
+              class="carousel-link"
+              :to="String('/cls/' + item.cid) + String('/') + item.tid">
+              <!-- 只用封面本身的宽高比撑开图片框，不做任何裁切 -->
+              <div class="carousel-figure">
+                <el-image
+                  class="carousel-img"
+                  :src="String('/svr/api/image/display/cls/') + item.cover"
+                  fit="cover" />
+              </div>
             </RouterLink>
           </el-carousel-item>
         </el-carousel>
+
+        <!-- 左右切换箭头：放在卡片外侧，米白圆底 + 铜棕细折线（不影响封面） -->
+        <button
+          type="button"
+          class="carousel-nav carousel-nav--prev"
+          aria-label="上一张"
+          @click="prevSlide">
+          <span class="carousel-chevron carousel-chevron--prev"></span>
+        </button>
+        <button
+          type="button"
+          class="carousel-nav carousel-nav--next"
+          aria-label="下一张"
+          @click="nextSlide">
+          <span class="carousel-chevron carousel-chevron--next"></span>
+        </button>
       </div>
       <!--轮播图结束-->
-      <!--文学推荐开始（5.3.4：按文学作品类型分组推荐）-->
-      <div class="recommend">
-        <div class="section-head">
-          <span class="section-title">文学推荐</span>
-          <span class="section-sub">按类型精选</span>
+      <el-divider border-style="dashed" />
+
+      <!--诗人介绍开始：先讲人再读诗，作品链接直达书评区-->
+      <PoetIntro />
+      <!--诗人介绍结束-->
+
+      <!--文学推荐栏目开始-->
+      <div v-for="item in recommendDatas" :key="item.tid" class="rec-group">
+        <!-- 类型名在左、「查看更多」在右，不放类型图标 -->
+        <div class="rec-group-head">
+          <span class="rec-group-name">{{ item.name }}</span>
+          <RouterLink
+            class="rec-more"
+            :to="{ name: 'clslist', params: { tid: item.tid } }">
+            查看更多 &gt;
+          </RouterLink>
         </div>
-        <div v-for="g in recommendGroups" :key="g.tid" class="rec-group">
-          <div class="rec-group-head">
-            <span class="rec-group-name">{{ g.name }}</span>
-            <span class="rec-group-count">共 {{ g.list.length }} 部</span>
-            <RouterLink
-              class="rec-more"
-              :to="{ name: 'clslist', params: { tid: g.tid } }">
-              查看全部 &gt;
-            </RouterLink>
-          </div>
-          <el-row :gutter="16">
-            <el-col
-              v-for="item in g.list.slice(0, 6)"
-              :key="item.cid"
-              :xs="12" :sm="8" :md="6" :lg="4">
-              <RouterLink class="rec-link" :to="'/cls/' + item.cid + '/' + g.tid">
-                <el-card class="rec-card" shadow="hover" :body-style="{ padding: '10px' }">
-                  <!--有封面图用图片，无封面时用 CSS 排版一张宣纸感封面-->
-                  <el-image
-                    v-if="item.cover"
-                    class="rec-cover"
-                    :src="String('/svr/api/image/display/cls/') + item.cover"
-                    fit="contain"/>
-                  <div v-else class="rec-cover rec-cover-text">
-                    <span class="cover-title">{{ item.title }}</span>
-                    <span class="cover-author">{{ item.author }}</span>
-                  </div>
-                  <div class="rec-title" :title="item.title">{{ item.title }}</div>
-                  <div class="rec-meta">{{ item.year }} · {{ item.author }}</div>
+        <div class="rec-group-body">
+            <el-row justify="center" :gutter="5" class="rec-row">
+              <el-col :span="4" v-for="classic in item.classics" :key="classic.cid">
+                <!-- 教材图 5.12：书名放 #header，封面放 body -->
+                <!-- 教材写作 style="padding: '0px'"（CSS 里带引号是无效值），
+                     要真正去掉卡片内边距需用 :body-style -->
+                <el-card class="rec-card" :body-style="{ padding: '0px' }">
+                  <template #header>{{ classic.title }}</template>
+                  <RouterLink :to="String('/cls/' + classic.cid) + String('/') + classic.tid">
+                    <img
+                      :src="String('/svr/api/image/display/cls/') + classic.cover"
+                      style="width: 100%; display: block" />
+                  </RouterLink>
                 </el-card>
-              </RouterLink>
-            </el-col>
-          </el-row>
+              </el-col>
+            </el-row>
         </div>
+        <el-divider border-style="dotted" />
       </div>
-      <!--文学推荐结束-->
+      <!--文学推荐栏目结束-->
     </el-main>
+
     <!--底部导航栏-->
     <el-footer height="60px"><FooterComp /></el-footer>
   </el-container>
@@ -235,14 +226,16 @@ const recommendGroups = computed<RecommendGroup[]>(() => {
   min-height: 100vh;
 }
 
-/* 欢迎横幅：宣纸底 + 墨褐字，与古典文学主题一致 */
+/* ==================== 欢迎横幅 ==================== */
+/* 宣纸底 + 墨褐字；左右留出诗人形象的位置，避免标题被压住 */
 .welcome-banner {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 4px 0 24px;
-  padding: 30px 32px;
+  min-height: 190px;
+  margin: 4px 0 18px;
+  padding: 26px 258px;
   border: 1px solid #e6d8bf;
   border-radius: 10px;
   background:
@@ -262,9 +255,12 @@ const recommendGroups = computed<RecommendGroup[]>(() => {
   right: 8%;
   height: 2px;
   background: linear-gradient(90deg, transparent, #c9a227, transparent);
+  z-index: 2;
 }
 
 .banner-text {
+  position: relative;
+  z-index: 2;
   width: 100%;
   text-align: center;
 }
@@ -288,17 +284,25 @@ const recommendGroups = computed<RecommendGroup[]>(() => {
   color: #9a7b53;
 }
 
-/* 搜索框：紧跟横幅、居中、限宽，作为首页主入口 */
+/* ==================== 5.3.3 搜索框 ==================== */
+/* 与轮播图同一列：限宽 760px 居中，两者左右边缘完全对齐 */
 .search-box {
-  max-width: 640px;
-  margin: 4px auto 34px;
+  width: 100%;
+  max-width: 760px;
+  margin: 14px auto 16px;
 }
 
-/* 搜索框内按钮与主题统一（朱红描边） */
+/* 搜索框内按钮与主题统一（朱红） */
 .search-box :deep(.el-input-group__append) {
   background: #a8352c;
   border-color: #a8352c;
   color: #fdf6e8;
+}
+
+/* 放大镜图标：EP 默认灰偏冷，换成宣纸色系的褐色，字号提到 16px 更清楚 */
+.search-box :deep(.el-input__prefix .el-icon) {
+  font-size: 16px;
+  color: #8c7a63;
 }
 
 .search-box :deep(.el-input-group__append:hover) {
@@ -306,231 +310,282 @@ const recommendGroups = computed<RecommendGroup[]>(() => {
   border-color: #8f2c24;
 }
 
-/* 轮播区：限宽让书封靠紧，避免 1200px 下三本书拉得过开 */
+/* ==================== 5.3.2 轮播图 ==================== */
+/* 与搜索框同宽（760px）：卡片位 = 380px；卡片高 440px，封面占中间 380px。
+   position: relative 是给外侧的左右箭头做定位参照 */
 .carousel-wrap {
-  max-width: 820px;
-  margin: 16px auto 12px;
+  --cls-cover-h: 380px;
+  --cls-stage-h: 440px;
+  position: relative;
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto 8px;
 }
 
-/* ===== 文学推荐（5.3.4） ===== */
-.recommend {
-  margin-top: 10px;
-  text-align: left;
+/* 教材用 nth-child 给轮播项加交替底色（原为 #99a9bf / #d3dce6 灰蓝），
+   换成本站宣纸色系，作用不变：无封面时也能看清轮播卡片轮廓 */
+.carousel-wrap :deep(.el-carousel__item:nth-child(2n)) {
+  background-color: #efe2ce;
 }
 
-.section-head {
+.carousel-wrap :deep(.el-carousel__item:nth-child(2n + 1)) {
+  background-color: #f6ecdc;
+}
+
+/* 卡片位里让书封水平垂直居中 */
+.carousel-wrap :deep(.el-carousel__item) {
   display: flex;
-  align-items: baseline;
-  gap: 10px;
-  margin-bottom: 18px;
-  padding-left: 12px;
-  border-left: 4px solid #a8352c;
+  align-items: center;
+  justify-content: center;
 }
 
-.section-title {
-  font-family: 'Songti SC', 'STSong', 'SimSun', serif;
-  font-size: 22px;
-  font-weight: 600;
-  letter-spacing: 3px;
-  color: #5a3a22;
+/* 封面链接：只作为书封外框的定位容器，不参与尺寸计算 */
+.carousel-link {
+  display: block;
 }
 
-.section-sub {
-  font-size: 12px;
-  letter-spacing: 2px;
-  color: #9a7b53;
+/* 书封外框：宽高按 600:870 直接算出来（380 × 0.6897 ≈ 262px），
+   不再被卡片宽度拉宽，所以封面整张可见、不会被裁上下或压扁。
+   注意 aspect-ratio 在块级盒宽高都确定时不生效，这里用 calc 写死宽度最稳；
+   封面高度 380 + 卡片上下各 30px 留白 = el-carousel 的 height 440px */
+.carousel-figure {
+  height: var(--cls-cover-h);
+  width: calc(var(--cls-cover-h) * 600 / 870);
+  overflow: hidden;
+  border-radius: 2px;
+  box-shadow: 0 8px 22px rgba(90, 58, 34, 0.26);
 }
 
+/* 图片框铺满外框；比例已经一致，cover 与 contain 等价，用 cover 兜住个别尺寸不一的图 */
+.carousel-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* 非当前卡片的白色遮罩默认 0.24，会把两侧书封冲得发白，降到 0.1 只留一点层次 */
+.carousel-wrap :deep(.el-carousel__mask) {
+  opacity: 0.1;
+}
+
+/* 底部切换按钮（indicator-position="outside"，排在封面下方）
+   默认按钮本体 30×2px、白色，又细又看不清，很难点中。
+   这里改到 .el-carousel 上覆盖组件变量（写在祖先上会被组件自身的同名变量顶掉）：
+     按钮本体 30×2 → 56×8，明显加粗加宽
+     加上内边距后单个可点区域 38×26 → 68×32，点击面积翻倍
+   6 个点共 408px，760px 宽的轮播放得下 */
+.carousel-wrap :deep(.el-carousel) {
+  --el-carousel-indicator-width: 56px;
+  --el-carousel-indicator-height: 8px;
+  --el-carousel-indicator-padding-horizontal: 6px;
+  --el-carousel-indicator-padding-vertical: 12px;
+}
+
+/* 按钮区与封面之间留一点间距，别贴着卡片底边 */
+.carousel-wrap :deep(.el-carousel__indicators--outside) {
+  margin-top: 4px;
+}
+
+/* 白色在宣纸底上等于隐形，换成铜棕；当前项用主题朱红实心区分 */
+.carousel-wrap :deep(.el-carousel__button) {
+  background-color: #b08a5d;
+  border-radius: 4px;
+}
+
+.carousel-wrap :deep(.el-carousel__indicator.is-active .el-carousel__button) {
+  background-color: #a8352c;
+  opacity: 1;
+}
+
+.carousel-wrap :deep(.el-carousel__indicator:hover .el-carousel__button) {
+  opacity: 0.72;
+}
+
+/* ==================== 轮播左右箭头（自绘，放在卡片外侧） ==================== */
+/* 设计稿：米白圆底、铜棕细折线、柔和投影，不压封面。
+   直径 56px，距轮播区左右各 12px（即距容器边缘 -68px）。
+   .el-carousel--horizontal 有 overflow: hidden，所以箭头不能放在组件里，
+   改挂在 .carousel-wrap 上，用绝对定位放到外面 */
+.carousel-nav {
+  position: absolute;
+  top: calc(var(--cls-stage-h) / 2);
+  transform: translateY(-50%);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: 1px solid #f2e6d0;
+  border-radius: 50%;
+  background-color: #fffdf6;
+  box-shadow: 0 6px 18px rgba(120, 85, 45, 0.12);
+  cursor: pointer;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.carousel-nav:hover {
+  background-color: #fdf6e6;
+  box-shadow: 0 8px 22px rgba(120, 85, 45, 0.18);
+}
+
+.carousel-nav:active {
+  transform: translateY(-50%) scale(0.96);
+}
+
+.carousel-nav--prev {
+  left: -68px;
+}
+
+.carousel-nav--next {
+  right: -68px;
+}
+
+/* 细折线箭头：两条边旋转 45°，不带箭杆，与设计稿一致 */
+.carousel-chevron {
+  width: 12px;
+  height: 12px;
+  border-left: 2px solid #8b5a3c;
+  border-bottom: 2px solid #8b5a3c;
+}
+
+.carousel-chevron--prev {
+  transform: rotate(45deg);
+  margin-left: 4px;
+}
+
+.carousel-chevron--next {
+  transform: rotate(-135deg);
+  margin-right: 4px;
+}
+
+/* ==================== 5.3.4 文学推荐 ==================== */
+/* 类型行：类型名在左，「查看更多」靠右，下面一条点状分隔线 */
 .rec-group {
-  margin-bottom: 26px;
+  /* 与下方卡片区同宽居中，否则「查看更多」会贴到页面最右边 */
+  max-width: 1180px;
+  margin: 0 auto 18px;
 }
 
 .rec-group-head {
   display: flex;
-  align-items: center;
+  align-items: baseline;
+  justify-content: space-between;
   gap: 10px;
-  margin-bottom: 10px;
-  padding-bottom: 6px;
+  padding-bottom: 8px;
   border-bottom: 1px dashed #e6d8bf;
 }
 
-.rec-group-count {
-  font-size: 12px;
-  color: #b39a78;
-}
-
-.rec-group-name {
-  font-family: 'Songti SC', 'STSong', 'SimSun', serif;
-  font-size: 16px;
-  letter-spacing: 2px;
-  color: #6b4226;
-}
-
-.rec-group-name::before {
-  content: '·';
-  margin-right: 6px;
-  color: #a8352c;
-}
-
 .rec-more {
-  margin-left: auto;
-  font-size: 12px;
+  font-size: 13px;
+  letter-spacing: 1px;
   color: #9a7b53;
   text-decoration: none;
+  white-space: nowrap;
+  transition: color 0.2s ease;
 }
 
 .rec-more:hover {
   color: #a8352c;
 }
 
-/* 卡片整体可点击，去掉链接默认的蓝色下划线 */
-.rec-link {
-  display: block;
-  text-decoration: none;
-  color: inherit;
+.rec-group-name {
+  font-family: 'Songti SC', 'STSong', 'SimSun', serif;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: #5a3a22;
+}
+
+/* 卡片区：教材用 mt-4 text-sm font-bold，这里换成等价样式 */
+/* 用 flex 居中：el-row 有 gutter 时会写内联负 margin，把 max-width 的居中
+   （margin: 0 auto）压掉了，卡片区会整体贴左，跟标题行错位 */
+.rec-group-body {
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* 一行 6 本的总宽度：不限宽时每本会被拉到 230px 宽、封面 330px 高，过于压场 */
+.rec-row {
+  width: 100%;
+  max-width: 1000px;
 }
 
 .rec-card {
-  margin-bottom: 16px;
+  /* 教材 :span="4" 一行 6 本不变，只把单张卡收窄居中 */
+  max-width: 152px;
+  margin: 0 auto 8px;
   border-color: #e6d8bf;
-  background: linear-gradient(180deg, #fdfaf4 0%, #faf5ec 100%);
-  transition: transform 0.2s ease;
+  background: #fdfaf4;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .rec-card:hover {
   transform: translateY(-3px);
+  box-shadow: 0 8px 18px rgba(90, 58, 34, 0.14);
 }
 
-.rec-cover {
-  width: 100%;
-  height: 170px;
-  border-radius: 4px;
-}
-
-/* 无封面作品：CSS 生成的宣纸封面（书名 + 作者） */
-.rec-cover-text {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 11px;
-  box-sizing: border-box;
-  padding: 16px 12px;
-  border: 1px solid #e0d0b4;
-  background:
-    radial-gradient(circle at 22% 16%, rgba(168, 53, 44, 0.06), transparent 58%),
-    linear-gradient(160deg, #fbf6ea 0%, #f2e6d1 100%);
-  /* 内嵌双线框，模仿线装书封的边框 */
-  box-shadow: inset 0 0 0 5px #fbf6ea, inset 0 0 0 6px #ece0c8;
-}
-
-.cover-title {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+/* 卡片标题（书名）居中，与封面上下对齐 */
+.rec-card :deep(.el-card__header) {
+  padding: 10px 6px;
   font-family: 'Songti SC', 'STSong', 'SimSun', serif;
-  font-size: 16px;
-  font-weight: 600;
-  line-height: 1.55;
-  letter-spacing: 2px;
-  text-indent: 2px; /* 抵消末字字间距造成的视觉偏右 */
-  text-align: center;
-  word-break: break-all;
-  color: #4a2f1b;
-}
-
-/* 作者名上方加一条短横线，与书名分层 */
-.cover-author {
-  position: relative;
-  padding-top: 10px;
-  font-family: 'Songti SC', 'STSong', 'SimSun', serif;
-  font-size: 12px;
+  font-size: 13px;
   letter-spacing: 1px;
-  color: #8a6a45;
-}
-
-.cover-author::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 50%;
-  width: 26px;
-  height: 1px;
-  margin-left: -13px;
-  background: #cbb492;
-}
-
-.rec-title {
-  margin-top: 8px;
-  font-family: 'Songti SC', 'STSong', 'SimSun', serif;
-  font-size: 14px;
+  text-align: center;
   color: #5a3a22;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-.rec-meta {
-  margin-top: 3px;
-  font-size: 12px;
-  color: #9a7b53;
-}
-</style>
-
-<style scoped>
-/* 竖版书封不适合铺满横排卡片：
-   去掉卡片的米色底板、让封面在卡片内居中悬浮
-   （用 .carousel-wrap 前缀提高权重，覆盖 Element Plus 的 .el-carousel__item 默认值） */
-.carousel-wrap :deep(.el-carousel__item) {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border-radius: 0;
-  box-shadow: none;
-  overflow: visible;
+/* ==================== 响应式 ==================== */
+/* 中等宽度：诗人缩小，横幅左右预留同步收紧 */
+@media (max-width: 1200px) {
+  .welcome-banner {
+    padding: 26px 190px;
+  }
 }
 
-/* RouterLink 是内联 <a>，高度 auto，会让内部 height:100% 全部失效
-   → 先让它撑满卡片高度，图片的 100% 才有参照 */
-.carousel-wrap :deep(.el-carousel__item > a) {
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  /* card 模式下相邻卡片会贴在一起，补一点内边距当间隔 */
-  padding: 0 14px;
-}
-
-/* 轮播封面：竖版书封按高度铺满、宽度自适应
-   关键：img 必须显式给 width/height 100% + object-fit: contain。
-   只写 width:auto 时，Element Plus 内部的 .el-image__inner 宽度是 100%、
-   高度却是 auto，图片会按容器宽度等比撑高（410×595 撑出 260 的卡片），
-   看起来就像书封被裁掉上下、比例被压扁。 */
-.carousel-img {
-  height: 100%;
-  width: 100%;
-  display: block;
-}
-
-.carousel-img :deep(img) {
-  height: 100%;
-  width: 100%;
-  object-fit: contain;
-  border-radius: 5px;
-  box-shadow: 0 8px 20px rgba(90, 58, 34, 0.22);
-}
-
-/* 窄屏：卡片宽度只剩约 195px，若沿用 340px 高度，书封上下会各空出 70px。
-   el-carousel 的 height 是写在 .el-carousel__container 上的内联样式，只能 !important 覆盖 */
-@media (max-width: 760px) {
-  .carousel-wrap :deep(.el-carousel__container) {
-    height: 200px !important;
+/* 窄屏：诗人隐藏，横幅与搜索框收边 */
+@media (max-width: 900px) {
+  .welcome-banner {
+    min-height: 140px;
+    padding: 26px 26px;
   }
 
-  .carousel-wrap :deep(.el-carousel__item > a) {
-    padding: 0 8px;
+  .banner-title {
+    font-size: 22px;
+    letter-spacing: 4px;
+    text-indent: 4px;
+  }
+
+  /* 视口不够宽时，760px 轮播两侧没有空位，外侧箭头会顶出屏幕：
+     直接隐藏，改由底部指示条和手势切换 */
+  .carousel-nav {
+    display: none;
+  }
+}
+
+/* 窄屏轮播降高度，避免书封上下空太多。
+   el-carousel 的 height 是写在 .el-carousel__container 上的内联样式，只能 !important 覆盖；
+   封面高度同步收窄（300 - 上下各 20 留白 = 260），宽度按 600:870 自动跟随。
+   指示条已放到卡片外面，不用再跟着调内边距 */
+@media (max-width: 760px) {
+  .carousel-wrap {
+    --cls-cover-h: 260px;
+    --cls-stage-h: 300px;
+  }
+
+  .carousel-wrap :deep(.el-carousel__container) {
+    height: 300px !important;
+  }
+
+  /* 窄屏 6 个点若仍是 68px 一个会超出屏宽，收窄到 44×6 */
+  .carousel-wrap :deep(.el-carousel) {
+    --el-carousel-indicator-width: 44px;
+    --el-carousel-indicator-height: 6px;
+    --el-carousel-indicator-padding-horizontal: 4px;
   }
 }
 </style>
