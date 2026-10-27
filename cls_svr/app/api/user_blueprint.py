@@ -1,16 +1,30 @@
+# ============================================================================
+# 用户蓝图（前缀 /api/user）
+# ----------------------------------------------------------------------------
+# 作用：注册、登录、查询登录用户、JWT 保护示例接口。
+# 教材：第六章 §6.3.1 注册、登录、查询登录用户（用户中心基础功能）
+#       第八章只新增三处：§8.3.2 头像上传、§8.3.3 信息修改、§8.3.5 密码重置
+#       参考：§8.2.1 Flask 文件上传（p224）
+# 调用：前端 /svr/api/user/... → 后端 /api/user/...
+# 约定：需要登录的接口用 @jwt_required()，用户编号一律从 Token 解析，
+#       不接受前端传入 uid（防越权）。
+# ============================================================================
 from flask import Blueprint, request
 from flask import jsonify
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
+import os
+import uuid
 import re
 
-# 引入数据库操作类
-from app.dao.UsersDao import UsersDao
+from app.conf.config import ALLOWED_EXTENSIONS, IMAGE_HEAD_PATH  # 导入上传头像的配置（文件扩展名的集合、头像路径）
+
+from app.dao.UsersDao import UsersDao  # 引入数据库操作类
 from app.model.models import Users, UsersSchema
 
 # 账号格式：3~20 位字母、数字、下划线（数据库 uname 是 VARCHAR(100)，
-# 不校验长度会让超长账号直接触发数据库报错，变成 500）
-UNAME_RE = re.compile(r'^[A-Za-z0-9_]{3,20}$')
+UNAME_RE = re.compile(r'^[A-Za-z0-9_]{3,20}$')  # 不校验长度会让超长账号直接触发数据库报错，变成 500）
 
 # ============================================================================
 # 本文件接口清单（蓝图前缀 /api/user，在 run.py 注册时指定）
@@ -37,8 +51,7 @@ UNAME_RE = re.compile(r'^[A-Za-z0-9_]{3,20}$')
 #   POST /svr/api/user/login
 # ============================================================================
 
-# 创建蓝图
-user_blueprint = Blueprint("user_blueprint", __name__)
+user_blueprint = Blueprint("user_blueprint", __name__)  # 创建蓝图
 
 # ============================================================================
 # 【接口】用户注册
@@ -46,11 +59,9 @@ user_blueprint = Blueprint("user_blueprint", __name__)
 # 请求体：{"uname","upwd","nickname","sex","phone"}
 # 返回：{code, msg}
 # ============================================================================
-# 用户注册 API
-@user_blueprint.route('/register', methods=["POST"])
+@user_blueprint.route('/register', methods=["POST"])  # 用户注册 API
 def register():
-    # 返回信息
-    result_msg = {"code": "200", "msg": "操作成功！"}
+    result_msg = {"code": "200", "msg": "操作成功！"}  # 返回信息
 
     # 获取并解析JSON格式的请求
     # silent=True：请求体不是合法 JSON 时返回 None，而不是让 Flask 直接抛 400
@@ -62,8 +73,7 @@ def register():
         result_msg["msg"] = "参数错误"
         return jsonify(result_msg)
 
-    # 获取注册数据
-    uname = request_body.get("uname")  # 登录账号
+    uname = request_body.get("uname")  # 登录账号  # 获取注册数据
     upwd = request_body.get("upwd")    # 登录密码
     nickname = request_body.get("nickname")  # 昵称
     avatar = "tx.png"  # 头像
@@ -94,8 +104,7 @@ def register():
         result_msg["msg"] = "电话号码格式不正确！"
         return jsonify(result_msg)
 
-    # 创建数据库操作对象
-    db_op = UsersDao()
+    db_op = UsersDao()  # 创建数据库操作对象
 
     # 账号查重：users 表 uname 无唯一约束，必须在此拦截重复注册
     if db_op.existsByUname(uname):
@@ -115,8 +124,7 @@ def register():
         result_msg["code"] = "400"
         result_msg["msg"] = "操作失败！"
 
-    # 返回操作结果
-    return jsonify(result_msg)
+    return jsonify(result_msg)  # 返回操作结果
 
 
 # ============================================================================
@@ -126,11 +134,9 @@ def register():
 # 返回：{code, msg, token}（成功时 token 为 JWT 字符串）
 # 校验规则：按 uname 查 users 表，密码一致才签发 Token（不再固定账号）
 # ============================================================================
-# 用户登录 API
-@user_blueprint.route('/login', methods=["POST"])
+@user_blueprint.route('/login', methods=["POST"])  # 用户登录 API
 def login():
-    # 返回信息
-    result_msg = {"code": "200", "msg": "操作成功！"}
+    result_msg = {"code": "200", "msg": "操作成功！"}  # 返回信息
 
     # 获取并解析JSON格式的请求（silent=True：非法 JSON 返回 None 而不是抛 400）
     request_body = request.get_json(silent=True)
@@ -139,8 +145,7 @@ def login():
         result_msg["msg"] = "参数错误"
         return jsonify(result_msg)
 
-    # 获取登录数据
-    uname = request_body.get("uname")  # 登录账号
+    uname = request_body.get("uname")  # 登录账号  # 获取登录数据
     upwd = request_body.get("upwd")    # 登录密码
 
     if not uname or not upwd:
@@ -148,14 +153,12 @@ def login():
         result_msg["msg"] = "账号和密码不能为空！"
         return jsonify(result_msg)
 
-    # 查库校验账号密码
-    db_op = UsersDao()
+    db_op = UsersDao()  # 查库校验账号密码
     user = db_op.getUserByUname(uname)
 
     # 密码校验：库里存的可能是哈希（新注册的用户），也可能是明文（历史数据）
     #   - 哈希：用 check_password_hash 校验
-    #   - 明文：直接比对，比对成功后立刻升级成哈希（无需人工迁移老数据）
-    passed = False
+    passed = False  # - 明文：直接比对，比对成功后立刻升级成哈希（无需人工迁移老数据）
     if user is not None:
         stored = user.upwd or ''
         if stored.startswith(('pbkdf2:', 'scrypt:')):
@@ -172,15 +175,13 @@ def login():
 
         # 创建 Token 并返回给客户端（核心代码！）
         # 注意：identity 存的是 uid（不是账号名），后续接口用它查用户；
-        # PyJWT 2.10 起 sub 必须是字符串，所以这里转成 str
-        access_token = create_access_token(identity=str(user.uid))
+        access_token = create_access_token(identity=str(user.uid))  # PyJWT 2.10 起 sub 必须是字符串，所以这里转成 str
         result_msg["token"] = access_token
     else:
         result_msg["code"] = "400"
         result_msg["msg"] = "账号或密码错误！"
 
-    # 返回操作结果
-    return jsonify(result_msg)
+    return jsonify(result_msg)  # 返回操作结果
 
 # ============================================================================
 # 【接口】受保护路由（验证 JWT 是否有效）
@@ -198,6 +199,71 @@ def protected():
 
 
 # ============================================================================
+# 【接口】上传用户头像（教材 8.2.2）
+# 调用方式：POST /api/user/upload
+# 请求体：form-data，参数名 file（png / gif / jpg / webp / jpeg）
+# 返回：{code:'200', msg:'上传成功！', upFile:'<uuid>.<ext>'}
+# ============================================================================
+def allowed_file(filename):  # 判断头像图片是否允许上传
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+@user_blueprint.route('/upload', methods=['POST'])  # 上传用户头像
+def upload():
+    result_msg = {"code": "200", "msg": "上传成功！"}  # 返回信息
+    # 判断是否有上传文件
+    if 'file' not in request.files:
+        result_msg["code"] = "404"
+        result_msg["msg"] = "文件不存在！"
+        return jsonify(result_msg)
+    upfile = request.files['file']  # 获取上传文件
+    # 判断是否允许上传
+    if upfile and allowed_file(upfile.filename):
+        upname = secure_filename(upfile.filename)  # 获取文件名称
+        fname = str(uuid.uuid4()) + '.' + upname.rsplit('.', 1)[1]  # 为处理重名情况，使用 uuid 生成文件名
+        upfile.save(os.path.join(IMAGE_HEAD_PATH, fname))  # 保存文件到存放目录
+        result_msg["upFile"] = fname
+    else:
+        result_msg["code"] = "400"  # 构建返回的 JSON 格式的数据
+        result_msg["msg"] = "上传失败！"
+    return jsonify(result_msg)  # 返回操作结果
+
+
+# ============================================================================
+# 【接口】个人信息修改（教材 8.2.3，需 JWT）
+# 调用方式：POST /api/user/update-user
+# 请求头：Authorization: Bearer <token>
+# 请求体：{"nickname", "avatar", "sex", "phone"}
+# 返回：{code:'200', msg:'操作成功！'} / {code:'404', msg:'操作失败！'}
+# ============================================================================
+@user_blueprint.route('/update-user', methods=['POST'])  # 个人信息修改 API
+@jwt_required()  # 用户身份鉴权
+def updateUser():
+    result_msg = {"code": "200", "msg": "操作成功！"}  # 返回信息
+    request_body = request.get_json()  # 获取并解析 JSON 格式的请求
+    # 判断传入的 JSON 格式的数据是否为空
+    if request.get_json() is None:
+        result_msg["code"] = "404"
+        result_msg["msg"] = "参数错误"
+        return jsonify(result_msg)
+    nickname = request_body.get("nickname")  # 获取参数
+    avatar = request_body.get("avatar")
+    sex = request_body.get("sex")
+    phone = request_body.get("phone")
+    uid = get_jwt_identity()  # 获取认证的用户编号（登录时，通过 uid 生成 Token）
+    db_op = UsersDao()  # 创建数据库操作对象
+    user = Users(uid=uid, nickname=nickname, sex=sex, phone=phone, avatar=avatar)  # 新建用户对象
+    flag = db_op.updateUserBySelf(user)  # 修改个人信息
+    if flag:
+        result_msg["code"] = "200"
+        result_msg["msg"] = "操作成功！"
+    else:
+        result_msg["code"] = "404"
+        result_msg["msg"] = "操作失败！"
+    return jsonify(result_msg)  # 返回操作结果
+
+
+# ============================================================================
 # 【接口】查询用户信息（教材 6.2）
 # 调用方式：GET /api/user/get-user
 # 请求头：Authorization: Bearer <token>（必须是登录后拿到的令牌）
@@ -210,25 +276,60 @@ def protected():
 @user_blueprint.route('/get-user')
 @jwt_required()  # 用户身份鉴权
 def getUser():
-    # 返回信息
-    result_msg = {"code": "200", "msg": "操作成功！"}
+    result_msg = {"code": "200", "msg": "操作成功！"}  # 返回信息
 
     # 获取认证的用户编号（登录时通过 uid 生成 Token）
-    uid = int(get_jwt_identity())
+    # 说明：教材写的是 uid = get_jwt_identity()（教材 Token 里存的是 int）；
+    #       本项目 PyJWT 2.10+ 要求 sub 必须是字符串，登录时存的是 str(uid)，
+    uid = int(get_jwt_identity())  # 所以这里用 int() 转回数字再查库，效果与教材一致。
 
-    # 创建数据库操作对象，查询用户信息
-    db_op = UsersDao()
+    db_op = UsersDao()  # 创建数据库操作对象，查询用户信息
     user = db_op.getUserByUid(uid)
 
     # 判断查询结果
     if user is not None:
-        # 将数据转换为 JSON 格式的数据
-        users_Schema = UsersSchema()
+        users_Schema = UsersSchema()  # 将数据转换为 JSON 格式的数据
         users_data = users_Schema.dump(user)
         result_msg["data"] = users_data
     else:
         result_msg["code"] = "404"
         result_msg["msg"] = "操作失败！"
 
-    # 返回操作结果
-    return jsonify(result_msg)
+    return jsonify(result_msg)  # 返回操作结果
+
+
+# ============================================================================
+# 【接口】密码重置（教材 8.3.5，需 JWT）
+# 调用方式：POST /api/user/update-pwd
+# 请求头：Authorization: Bearer <token>
+# 请求体：{"oldpwd", "newpwd"}
+# 返回：{code:'200', msg:'修改成功！'} / {code:'404', msg:'旧密码不正确'}
+# ============================================================================
+@user_blueprint.route('/update-pwd', methods=["POST"])  # 密码重置 API
+@jwt_required()  # 用户身份鉴权
+def updatePwd():
+    result_msg = {"code": "200", "msg": "操作成功！"}  # 返回信息
+    request_body = request.get_json()  # 获取并解析 JSON 格式的请求
+    # 判断传入的 JSON 格式的数据是否为空
+    if request.get_json() is None:
+        result_msg["code"] = "404"
+        result_msg["msg"] = "参数错误"
+        return jsonify(result_msg)
+    oldpwd = request_body.get("oldpwd")  # 获取参数
+    newpwd = request_body.get("newpwd")
+    uid = get_jwt_identity()  # 获取认证的用户编号（登录时，通过 uid 生成 Token）
+    db_op = UsersDao()  # 创建数据库操作对象
+    user = db_op.getUserByUid(uid)  # 查询用户信息
+    # 判断旧密码是否正确
+    if user.upwd == oldpwd:
+        flag = db_op.updateUserByPwd(uid, newpwd)  # 修改用户信息
+        if flag:
+            result_msg["code"] = "200"
+            result_msg["msg"] = "修改成功！"
+        else:
+            result_msg["code"] = "404"
+            result_msg["msg"] = "操作失败！"
+    else:
+        result_msg["code"] = "404"
+        result_msg["msg"] = "旧密码不正确"
+    return jsonify(result_msg)  # 返回操作结果

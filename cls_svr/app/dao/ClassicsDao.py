@@ -1,3 +1,12 @@
+# ============================================================================
+# 文学数据访问层（DAO）
+# ----------------------------------------------------------------------------
+# 作用：把 SQLAlchemy 查询收在一处，蓝图只调方法、不写查询语句。
+# 教材：第六章 §6.3 评分与顶/踩（基础）
+#       第七章新增 §7.3.1 书评展示 / §7.3.2 书评发表 / §7.3.3 书评评价（p204–221）
+# 约定：方法编号与 classics_blueprint.py 顶部的接口清单对应；
+#       异常只打印不抛出，返回 None 由上层判断（沿用教材写法）。
+# ============================================================================
 from app import db
 from app.model.models import Classictype, Classics, Discuss
 from app.model.models import Classicjudges, Discussjudges
@@ -6,18 +15,15 @@ from app.model.models import Classicjudges, Discussjudges
 class ClassicsDao:
     def __init__(self):
         print("ClassicsDao is running")
-    # 1. 获取文学作品类型列表
-    def getClassictypes(self):
+    def getClassictypes(self):  # 1. 获取文学作品类型列表
         try:
-            # 获取所有文学作品类型
-            classictypes = Classictype.query.all()
+            classictypes = Classictype.query.all()  # 获取所有文学作品类型
             return classictypes
         except Exception as e:
             print(e)
             pass
 
-    # 2. 获取首页轮播图数据（按评分倒序取前 number 条；只取有封面的作品）
-    def getCarousels(self, number):
+    def getCarousels(self, number):  # 2. 获取首页轮播图数据（按评分倒序取前 number 条；只取有封面的作品）
         try:
             carousels = Classics.query.filter(
                 Classics.cover.isnot(None), Classics.cover != ''
@@ -49,8 +55,7 @@ class ClassicsDao:
             print(e)
             pass
 
-    # 4. 按类型编号查询文学作品类型（教材 6.3.3）
-    def getClassictypeByTid(self, tid):
+    def getClassictypeByTid(self, tid):  # 4. 按类型编号查询文学作品类型（教材 6.3.3）
         try:
             classictype = Classictype.query.get(tid)
             return classictype
@@ -58,8 +63,7 @@ class ClassicsDao:
             print(e)
             pass
 
-    # 5. 获取某文学作品类型下的文学列表（教材 6.3.3，按星级评分从高到低）
-    def getClassicsByTid(self, tid):
+    def getClassicsByTid(self, tid):  # 5. 获取某文学作品类型下的文学列表（教材 6.3.3，按星级评分从高到低）
         try:
             classics = Classics.query.filter(Classics.tid == tid) \
                 .order_by(Classics.rating.desc()).all()
@@ -68,8 +72,18 @@ class ClassicsDao:
             print(e)
             pass
 
-    # 6. 按作品编号查询文学作品（教材 6.3.4）
-    def getClassicsByCid(self, cid):
+    # 5-1. 获取某文学作品类型下评分最高的前 number 部作品（首页文学推荐用，教材 3.3.5）
+    def getClassicsByTidLimit(self, tid, number):
+        try:
+            classics = Classics.query.filter(Classics.tid == tid) \
+                .order_by(Classics.rating.desc(), Classics.cid.asc()) \
+                .limit(number).all()
+            return classics
+        except Exception as e:
+            print(e)
+            pass
+
+    def getClassicsByCid(self, cid):  # 6. 按作品编号查询文学作品（教材 6.3.4）
         try:
             classic = Classics.query.get(cid)
             return classic
@@ -77,44 +91,25 @@ class ClassicsDao:
             print(e)
             pass
 
-    # 7. 评价文学作品（教材 6.3.5）
-    #    向评价表插入一条记录，并把作品的星级更新为"已有评分与新评分中的较大值"
-    #    注意单位：前端提交的是 1~5 星，classics.rating 存的是 0~100 分
-    #    （前端展示时 rating/20 换算成 5 星），所以这里必须先 ×20 再比较，
-    #    否则 max(5, 90) 永远等于原值，用户的评价等于白打。
-    #    同一用户对同一作品重复打分时，只更新原记录，不再插新行（否则评价表无限膨胀）
-    def updateClassicRating(self, judge):
-        flag = True  # 成功标志
+    def updateClassicRating(self, judge):  # 7. 评价文学作品（教材 6.3.5）
+        # 成功标志。此处 flag 的值为 True 表示操作成功，为 False 表示操作失败
+        flag = True
         try:
-            # 查询文学作品
-            classics = Classics.query.get(judge.cid)
-            # 星级换算成百分制
-            new_rating = judge.rating * 20
-            # 判断该用户是否已评价过这部作品
-            old = Classicjudges.query.filter(
-                Classicjudges.cid == judge.cid,
-                Classicjudges.uid == judge.uid
-            ).first()
-            if old is not None:
-                # 已评价过：覆盖原记录，评价数不再 +1
-                old.rating = judge.rating
-                old.jdate = judge.jdate
-            else:
-                # 首次评价：评价数 +1，插入新记录
-                classics.commentscount = (classics.commentscount or 0) + 1
-                db.session.add(judge)
-            # 设置文学作品星级（取最高评分）
-            classics.rating = max(new_rating, classics.rating or 0)
+            classic = Classics.query.get(judge.cid)  # 查询文学作品
+            if classic is None:  # 作品不存在，直接判失败，避免对 None 取属性
+                return False
+            # 两个评分字段都可能为 NULL，先 or 0 兜底，再取较高分
+            classic.rating = max(judge.rating or 0, classic.rating or 0)  # 设置文学作品星级评价（取最高评价）
+            db.session.add(judge)  # 将评价信息插入文学作品评价表
             db.session.commit()  # 提交至数据库
         except Exception as e:
             flag = False
-            print(e)
             db.session.rollback()  # 异常，回滚数据库
+            pass
         return flag
 
     # 8. 获取某文学作品的评论列表（教材 7.3.1）
-    #    按评论时间从高到低排序，最新的书评排在最前面
-    def getDiscussByCid(self, cid):
+    def getDiscussByCid(self, cid):  # 按评论时间从高到低排序，最新的书评排在最前面
         try:
             discuss = Discuss.query.filter(Discuss.cid == cid) \
                 .order_by(Discuss.cdate.desc()).all()
@@ -123,67 +118,48 @@ class ClassicsDao:
             print(e)
             pass
 
-    # 9. 发表文学评论（教材 7.3.2）
-    #    向评论表插入一条记录，并把作品的评论数 +1
-    def addDiscuss(self, discuss):
-        flag = True  # 成功标志
+    def addDiscuss(self, discuss):  # 9. 发表文学评论（教材 7.3.2）
+        # 成功标志。此处 flag 的值为 True 表示操作成功，为 False 表示操作失败
+        flag = True
         try:
-            # 查询对应的文学作品
-            classic = Classics.query.get(discuss.cid)
-            # 设置作品的评论数量 +1
-            classic.commentscount = (classic.commentscount or 0) + 1
-            # 把评论加入文学评论表
-            db.session.add(discuss)
+            classic = Classics.query.get(discuss.cid)  # 查询对应的文学作品
+            if classic is None:  # 作品不存在，直接判失败，避免对 None 取属性
+                return False
+            classic.commentscount = (classic.commentscount or 0) + 1  # 设置文学作品的评论数量（加 1）
+            db.session.add(discuss)  # 将评论插入文学评论表
             db.session.commit()  # 提交至数据库
         except Exception as e:
             flag = False
-            print(e)
             db.session.rollback()  # 异常，回滚数据库
+            pass
         return flag
 
-    # 10. 评价书评（教材 7.3.3）
-    #     toplow=1 记「顶」，toplow=0 记「踩」；同时把这条评价写进评论评价表
-    #     同一用户对同一条书评只保留一条记录：
-    #       - 同方向重复提交 → 返回 'repeat'（不重复累加，否则一个人能顶 100 次）
-    #       - 反方向提交     → 改判，原方向计数 -1、新方向计数 +1
-    #     返回值：'ok' 成功 / 'repeat' 重复 / 'fail' 异常
-    def updateDiscussTopLow(self, judge):
+    def updateDiscussTopLow(self, judge):  # 10. 评价书评（教材 7.3.3）
+        # 成功标志。此处 flag 的值为 True 表示操作成功，为 False 表示操作失败
+        flag = True
         try:
-            # 查询书评信息
-            dis = Discuss.query.get(judge.did)
-            if dis is None:
-                return 'fail'
-            # 查询该用户对这条书评的历史评价
-            old = Discussjudges.query.filter(
-                Discussjudges.did == judge.did,
-                Discussjudges.uid == judge.uid
-            ).first()
-
-            if old is not None and old.toplow == judge.toplow:
-                # 同方向重复：直接告诉前端「已经评价过」
-                return 'repeat'
-
-            if old is not None:
-                # 反方向改判：先把旧方向的计数减回去
-                if old.toplow == 1:
-                    dis.topcount = max((dis.topcount or 0) - 1, 0)
-                else:
-                    dis.lowcount = max((dis.lowcount or 0) - 1, 0)
-                old.toplow = judge.toplow
-                old.jdate = judge.jdate
-            else:
-                # 首次评价：插入新记录
-                db.session.add(judge)
-
-            # 新方向计数 +1
+            dis = Discuss.query.get(judge.did)  # 查询书评信息
+            if dis is None:  # 书评不存在，直接判失败，避免对 None 取属性
+                return False
+            # 设置书评的顶、踩的数量
             if judge.toplow == 1:
                 dis.topcount = (dis.topcount or 0) + 1
             else:
                 dis.lowcount = (dis.lowcount or 0) + 1
-
+            db.session.add(judge)  # 将评价信息插入评论评价表
             db.session.commit()  # 提交至数据库
-            return 'ok'
+        except Exception as e:
+            flag = False
+            db.session.rollback()  # 异常，回滚数据库
+            pass
+        return flag
+
+    def getDiscussesByUid(self, uid):  # 12. 获取登录用户的书评数据（教材 8.3.4）
+        try:
+            # 排序查询：按评论时间从高到低排序
+            discuss = Discuss.query.filter(Discuss.uid == uid) \
+                .order_by(Discuss.cdate.desc()).all()
+            return discuss
         except Exception as e:
             print(e)
-            db.session.rollback()  # 异常，回滚数据库
-            return 'fail'
+            pass

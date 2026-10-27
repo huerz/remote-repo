@@ -1,3 +1,10 @@
+# ============================================================================
+# 图片显示蓝图（前缀 /api/image）
+# ----------------------------------------------------------------------------
+# 作用：按「类型 + 文件名」读取本地图片并返回二进制流，封面/头像都走这里。
+# 调用：GET /api/image/display/<type>/<filename>，type = cls（作品封面）或 head（头像）
+# 约定：图片根目录见 app/conf/config.py；文件名要做安全校验，禁止路径穿越。
+# ============================================================================
 from flask import Blueprint, jsonify, send_from_directory
 from werkzeug.exceptions import NotFound
 import os
@@ -30,12 +37,10 @@ from app.conf.config import IMAGE_CLS_PATH, IMAGE_HEAD_PATH
 #   /svr/api/image/display/cls/唐诗/jys.jpg
 # ============================================================================
 
-# 创建蓝图
-image_blueprint = Blueprint("image_blueprint", __name__)
+image_blueprint = Blueprint("image_blueprint", __name__)  # 创建蓝图
 
 # 文件名 -> 相对 IMAGE_CLS_PATH 的路径，例如 'jys.jpg' -> '唐诗/jys.jpg'
-# 首次访问时建立，文件名没命中时重建一次（新增图片无需重启服务）
-_cls_index = {}
+_cls_index = {}  # 首次访问时建立，文件名没命中时重建一次（新增图片无需重启服务）
 
 
 def _build_cls_index():
@@ -46,8 +51,7 @@ def _build_cls_index():
             for name in files:
                 rel = os.path.relpath(os.path.join(root, name), IMAGE_CLS_PATH)
                 # 统一用正斜杠：Werkzeug 的 safe_join 不认 Windows 反斜杠，
-                # 反斜杠路径会被判定为非法而抛 404
-                index.setdefault(name, rel.replace(os.sep, '/'))
+                index.setdefault(name, rel.replace(os.sep, '/'))  # 反斜杠路径会被判定为非法而抛 404
     return index
 
 
@@ -62,8 +66,7 @@ def _resolve_cls(filename):
         _cls_index = _build_cls_index()
     rel = _cls_index.get(os.path.basename(filename))
     if rel is None:
-        # 可能是刚归档进来的新图，重建一次索引再找
-        _cls_index = _build_cls_index()
+        _cls_index = _build_cls_index()  # 可能是刚归档进来的新图，重建一次索引再找
         rel = _cls_index.get(os.path.basename(filename))
     return rel
 
